@@ -1,0 +1,42 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = ['bank','concepts','engine'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+vm.runInNewContext(source+`
+  assert.equal(bank.length,73);
+  for (const [id,q] of bank.entries()) {
+    assert.equal(q.id,id);
+    assert.equal(new Set(q.options).size,4);
+    if (q.concept) assert(concepts[q.concept]);
+  }
+  assert.equal(bank[4].concept,'action-place');
+  assert.equal(chooseQuestion([],()=>0).level,3);
+  const attempt = (id,choice)=>({id,choice,seconds:5});
+  const seen = [attempt(4,1)];
+  const initial = assess(seen);
+  const practiced = assess([...seen,attempt(60,0)]);
+  assert.deepEqual(practiced.overall,initial.overall);
+  assert.equal(practiced.practice.length,1);
+  assert.equal(studyPriority(practiced),null);
+  const repeated = assess([...seen,attempt(60,1)]);
+  assert.equal(studyPriority(repeated).concept,'action-place');
+  assert.equal(studyPriority(repeated).repeated,true);
+  const regular = assess([attempt(0,0),attempt(1,0)]);
+  const advanced = assess([attempt(48,0),attempt(49,0)]);
+  assert(advanced.skill[0].readiness>=0 && advanced.skill[0].readiness<=1);
+  assert(advanced.overall.weights[5]>regular.overall.weights[5]);
+  for (const [choice,expected] of [[0,5],[null,0]]) {
+    const answers=[];
+    const ids=new Set();
+    while (answers.length<bank.length) {
+      const question=chooseQuestion(answers,()=>0);
+      assert(!ids.has(question.id));
+      ids.add(question.id);
+      answers.push(attempt(question.id,choice));
+      if (answers.length===12) assert.equal(assess(answers).overall.band,expected);
+    }
+    assert.equal(chooseQuestion(answers),undefined);
+    assert.equal(assess(answers).overall.band,expected);
+  }
+  console.log('Engine checks passed');
+`,{assert,console});
