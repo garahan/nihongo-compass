@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','engine'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','engine','blueprint'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
   assert.equal(bank.length,73);
   for (const [id,q] of bank.entries()) {
@@ -12,6 +12,14 @@ vm.runInNewContext(source+`
   assert.equal(bank[4].concept,'action-place');
   assert.equal(chooseQuestion([],()=>0).level,3);
   const attempt = (id,choice)=>({id,choice,seconds:5});
+  const domainRows = assessmentCoverage([attempt(0,0),attempt(1,null)],bank);
+  const knowledge = domainRows.find(domain=>domain.id==='knowledge');
+  assert.equal(knowledge.skills[0].status,'needs-evidence');
+  assert.equal(knowledge.skills[0].answers,1);
+  assert.equal(assessmentCoverage([attempt(0,0),attempt(1,1)],bank)[1].skills[0].status,'sampled');
+  assert(domainRows.find(domain=>domain.id==='listening').skills.every(row=>row.status==='unavailable'));
+  const skillIds = assessmentBlueprint.domains.flatMap(domain=>domain.skills.map(row=>row[0]));
+  assert.equal(new Set(skillIds).size,skillIds.length);
   const seen = [attempt(4,1)];
   const initial = assess(seen);
   const practiced = assess([...seen,attempt(60,0)]);

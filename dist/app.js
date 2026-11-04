@@ -122,6 +122,7 @@ function bar(name,{n,right}) {
 function report() {
   const state = assess(attempts);
   const {overall,reference,placement,practice,skill} = state;
+  const coverage = assessmentCoverage(placement,bank);
   const total = tally(placement);
   const [lower,upper] = overall.range;
   const range = lower===upper ? '' : ` · Estimated range: ${label(lower)}–${label(upper)}`;
@@ -134,14 +135,21 @@ function report() {
   const evidence = skill.map(({n,readiness},id)=>`<div class="bar"><strong>${skills[id]}</strong><span>${n>=2?`${Math.round(readiness*100)}% · ${n} answers`:'Still checking'}</span>${n>=2?`<progress aria-label="${skills[id]} readiness" max="1" value="${readiness}"></progress>`:''}</div>`).join('');
   app.innerHTML = `<section class="panel result-head"><p class="eyebrow">Your placement · ${attempts.length} answers</p><h1 tabindex="-1">Likely ${label(overall.band)}</h1>
   <p>${total.right}/${total.n} placement answers correct${range}</p>
-  <p>Provisional language-knowledge estimate.${practice.length?` ${practice.length} follow-up answers tracked separately as practice.`:''}</p>
+  <p>Provisional estimate for language knowledge.${practice.length?` ${practice.length} follow-up answers tracked separately as practice.`:''}</p>
   <div class="actions">${attempts.length<max?'<button data-action="continue">Continue test →</button>':'<span>All available questions answered.</span>'}</div></section>
   <nav class="result-nav" aria-label="Results sections"><a href="#study">Study next</a><a href="#skills">Skill map</a><a href="#review">Missed questions (${missed.length})</a></nav>
   <section class="panel result-section" id="study" tabindex="-1"><h2>Study next</h2>
   ${plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><p><a href="${origin}/${plan.route}">Open lesson library →</a></p>`:'<p>Continue the test to identify a specific study priority.</p>'}
   <div class="actions">${overall.band===0?`<a class="button-link secondary" href="${origin}/materials">Open beginner lessons</a>`:''}<a class="button-link secondary" href="${drill}">Open ${label(reference)} drills →</a></div><small>Resources from Nihongo to Japan.</small></section>
   <div class="reportgrid"><section class="panel result-section" id="skills" tabindex="-1"><h2>Skill map</h2>${radar(skill)}${evidence}<small>Estimated readiness at ${label(reference)}, based on question difficulty and answers.</small></section>
-  <section class="panel"><h2>Evidence by level</h2>${bands.slice(1).map(band=>bar(label(band),tally(placement.filter(entry=>difficulty(bank[entry.id])===band)))).join('')}</section></div>
+  <section class="panel"><h2>Evidence by level</h2>${bands.slice(1).map(band=>bar(label(band),tally(placement.filter(entry=>difficulty(bank[entry.id])===band)))).join('')}
+  <details><summary>What this test measures</summary>
+  <p>Below N5 and N1 are the edges of the current estimate. The test cannot place you within foundations or beyond N1.</p>
+  <ul>${coverage.map(domain=>{
+    const available = domain.skills.filter(row=>row.status!=='unavailable');
+    const sampled = available.filter(row=>row.status==='sampled').length;
+    return `<li><strong>${domain.label}</strong> · ${available.length ? `${sampled} of ${available.length} available skills sampled` : 'Not assessed'}${available.length && available.length<domain.skills.length ? ' · partial coverage' : ''}</li>`;
+  }).join('')}</ul></details></section></div>
   <section class="panel result-section" id="review" tabindex="-1"><h2>Review missed questions</h2>${missed.length?missed.map(entry=>{
     const q=bank[entry.id];
     return `<details><summary>${practice.includes(entry)?'Practice · ':''}N${q.level} · ${q.prompt}</summary><p>${entry.choice===null?'Skipped':'You chose: '+q.options[entry.choice]}<br><strong>Answer: ${q.options[0]}</strong><br>${q.why}</p></details>`;

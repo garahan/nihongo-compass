@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nihongo Compass content catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "concepts", "stimuli", "items", "resources"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "concepts": { "type": "array", "items": { "$ref": "#/$defs/concept" } },
+    "stimuli": { "type": "array", "items": { "$ref": "#/$defs/stimulus" } },
+    "items": { "type": "array", "items": { "$ref": "#/$defs/item" } },
+    "resources": { "type": "array", "items": { "$ref": "#/$defs/resource" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "band": { "enum": ["foundation", "n5", "n4", "n3", "n2", "n1", "advanced"] },
+    "idList": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "concept": {
+      "type": "object",
+      "required": ["id", "skillId", "prerequisiteIds"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "skillId": { "$ref": "#/$defs/id" },
+        "prerequisiteIds": { "$ref": "#/$defs/idList" }
+      }
+    },
+    "stimulus": {
+      "type": "object",
+      "required": ["id", "revision", "kind", "locale", "source"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "kind": { "enum": ["passage", "audio", "visual", "scenario"] },
+        "locale": { "type": "string", "minLength": 2 },
+        "source": { "type": "string", "minLength": 1 },
+        "transcriptRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["id", "revision", "band", "skillId", "conceptIds", "format", "familyId", "locale", "promptRef", "scoringRef", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "band": { "$ref": "#/$defs/band" },
+        "skillId": { "$ref": "#/$defs/id" },
+        "conceptIds": { "$ref": "#/$defs/idList" },
+        "familyId": { "$ref": "#/$defs/id" },
+        "stimulusId": { "$ref": "#/$defs/id" },
+        "format": { "enum": ["choice", "ordering", "typed", "recorded", "rubric"] },
+        "locale": { "type": "string", "minLength": 2 },
+        "promptRef": { "type": "string", "minLength": 1 },
+        "scoringRef": { "type": "string", "minLength": 1 },
+        "explanationRef": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["draft", "pilot", "active", "retired"] },
+        "calibration": {
+          "type": "object",
+          "required": ["model", "difficulty", "discrimination", "guessing", "sampleSize"],
+          "properties": {
+            "model": { "type": "string", "minLength": 1 },
+            "difficulty": { "type": "number" },
+            "discrimination": { "type": "number", "exclusiveMinimum": 0 },
+            "guessing": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+            "sampleSize": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": ["id", "kind", "band", "skillIds", "conceptIds", "locale", "contentRef"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["lesson", "drill", "review", "reference"] },
+        "band": { "$ref": "#/$defs/band" },
+        "skillIds": { "$ref": "#/$defs/idList" },
+        "conceptIds": { "$ref": "#/$defs/idList" },
+        "locale": { "type": "string", "minLength": 2 },
+        "contentRef": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
