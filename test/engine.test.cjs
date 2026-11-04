@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-errata','mahym-bank','transfer','engine','blueprint','session'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-errata','mahym-bank','transfer','engine','blueprint','session','report-analytics'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
   assert.equal(bank.length,273+mahymItems.length);
   assert.equal(mahymItems.length,2104);
@@ -94,6 +94,12 @@ vm.runInNewContext(source+`
   assert.equal(bandRiskReduction([.5,.5,0,0,0,0],[.6,.6,.6,.6,.6,.6],.5),0);
   assert(bandRiskReduction([.5,.5,0,0,0,0],[.25,.9,.9,.9,.9,.9],.5)>.25);
   const skip = assess([attempt(0,null)]);
+  assert(summarizeReport(skip).categories.every(row=>row.readiness===null));
+  const grammar = summarizeReport(assess([attempt(4,1),attempt(5,1)]));
+  assert.equal(grammar.focus.id,2);
+  assert.equal(grammar.categories.find(row=>row.name==='Grammar').measured.length,1);
+  assert.equal(grammar.levels.filter(row=>row.selected).length,1);
+  assert.equal(grammar.levels.reduce((sum,row)=>sum+row.percent,0),100);
   const wrong = assess([attempt(0,1)]);
   assert.deepEqual(skip.overall,assess([]).overall);
   assert(assess([attempt(0,null)],true).overall.weights[0]>skip.overall.weights[0]);

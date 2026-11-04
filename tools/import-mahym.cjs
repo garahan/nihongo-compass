@@ -62,6 +62,9 @@ if (fs.existsSync(itemPath)) {
 }
 fs.writeFileSync(itemPath,prefix+JSON.stringify(imported)+';\n');
 fs.writeFileSync('dist/mahym-study.json',JSON.stringify({lessons,stories,threads})+'\n');
+fs.writeFileSync('dist/mahym-topics.js','const mahymTopics = '+JSON.stringify(Object.fromEntries(
+  lessons.map(lesson=>[lesson.lesson,lesson.topicEn??lesson.topic])
+))+';\n');
 fs.mkdirSync('seeds',{recursive:true});
 fs.writeFileSync('seeds/mahym-review.json',JSON.stringify(review)+'\n');
 console.log(JSON.stringify({imported:imported.length,review:review.reduce((counts,row)=>

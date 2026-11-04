@@ -167,13 +167,18 @@ function report() {
   stage.textContent = 'Results';
   const state = assess(attempts);
   const {overall,reference,placement,practice,skill,quality} = state;
+  const analytics = summarizeReport(state);
   const coverage = assessmentCoverage(placement,bank);
   const total = tally(placement);
   const [lower,upper] = overall.range;
   const hasEstimate = quality.chosen>=4;
   const range = !hasEstimate || lower===upper ? '' : ` · Estimated range: ${label(lower)}–${label(upper)}`;
-  const priority = studyPriority(state);
-  const importedLesson = mahymRecommendation(placement,reference);
+  const rawPriority = studyPriority(state);
+  const focus = analytics.focus;
+  const priority = focus && rawPriority?.concept &&
+    !bank.some(q=>q.concept===rawPriority.concept && q.skill===focus.id) ? null : rawPriority;
+  const focusedPlacement = focus ? placement.filter(entry=>bank[entry.id].skill===focus.id) : placement;
+  const importedLesson = mahymRecommendation(focusedPlacement,reference);
   const diagnosis = locationDiagnosis(state);
   const eligibleForTransfer = !attempts.some(entry=>isTransferItem(entry.id));
   const plan = priority?.concept ? concepts[priority.concept] : priority ? {
@@ -182,6 +187,17 @@ function report() {
   const drill = origin+'/challenge/'+label(reference).toLowerCase();
   const missed = attempts.filter(entry=>entry.choice!==0);
   const more = canContinue();
+  const chart = hasEstimate ? `<div class="placement-chart" role="group" aria-label="Relative model support by level">${analytics.levels.map(({band,percent,selected})=>{
+    return `<div class="level-column ${selected?'is-estimate':''}" aria-label="${label(band)}, ${percent}% model support${selected?', estimated band':''}"><span>${percent}%</span><div class="plot" aria-hidden="true"><span style="--probability:${percent}%"></span></div><strong>${label(band)}</strong></div>`;
+  }).join('')}</div><small>Model support across levels. These percentages are separate from test accuracy.</small>` : '';
+  const categoryBars = analytics.categories.map(category=>{
+    const isFocus = hasEstimate && (diagnosis.confirmed ? category.name==='Grammar' :
+      focus && category.ids.includes(focus.id));
+    const partial = category.measured.length>0 && category.measured.length<category.ids.length;
+    return `<div class="category-row ${isFocus?'is-focus':''}"><strong>${category.name}${isFocus?' · Study first':''}</strong><span>${category.readiness===null?'Still checking':Math.round(category.readiness*100)+'%'}</span>
+      ${category.readiness===null?'':`<progress aria-label="${category.name} estimated readiness" max="1" value="${category.readiness}"></progress>`}
+      <span>${category.answers} chosen placement answers${partial?' · Partial coverage':''}</span></div>`;
+  }).join('');
   const sparse = skill.findIndex(row=>row.n<2);
   const continuation = !hasEstimate ? 'Choose an answer when you can. Skips help route the test, but a level estimate needs answered questions.'
     : !quality.sufficient && quality.covered<4 ? 'More questions can give us enough evidence across several skills.'
@@ -201,19 +217,28 @@ function report() {
   app.innerHTML = `<section class="panel result-head"><p class="eyebrow">Your placement · ${attempts.length} responses</p><h1 tabindex="-1">${hasEstimate?`Likely ${label(overall.band)}`:'More evidence needed'}</h1>
   <p>${quality.chosen?`${total.right}/${quality.chosen} placement answers correct`:'No placement answers chosen yet'}${range}${total.n>quality.chosen?` · ${total.n-quality.chosen} placement skips`:''}</p>
   <p>${quality.focused?'Focused language-knowledge estimate.':quality.sufficient?'Provisional language-knowledge estimate.':'Early language-knowledge evidence.'}${practice.length?` ${practice.length} responses tracked separately as practice.`:''}</p>
+  ${chart}
   <div class="actions">${more?'<button data-action="continue">Continue test →</button>':'<span>All available placement questions answered.</span>'}</div>
   ${more?`<small>${continuation}</small>`:''}</section>
-  <nav class="result-nav" aria-label="Results sections"><a href="#study">Study next</a><a href="#skills">Skill map</a><a href="#review">Missed questions (${missed.length})</a></nav>
-  <section class="panel result-section" id="study" tabindex="-1"><h2>Study next</h2>
+  <nav class="result-nav" aria-label="Results sections"><a href="#study">Study path</a><a href="#skills">Skill comparison</a><a href="#review">Missed questions (${missed.length})</a></nav>
+  <section class="panel result-section" id="study" tabindex="-1"><h2>Your study path</h2>
+  ${hasEstimate && focus && !diagnosis.confirmed?`<p><strong>Start with ${skills[focus.id].toLowerCase()}.</strong> You missed ${focus.missed} of ${focus.attempted} questions in this skill near ${label(reference)}.</p>`:''}
+  <ol class="study-steps"><li><strong>1 · Review</strong>
   ${diagnosis.confirmed ? `<h3>${transferProbe.title}</h3><p>You chose the other location particle in ${diagnosis.placement+diagnosis.practice} sentences. ${transferProbe.explanation}</p>
   ${followup || eligibleForTransfer ? '<button data-action="transfer">Review and follow up</button>' : `<a class="button-link" href="${origin}/grammar">Open grammar library →</a>`}`
   : !hasEstimate?`<p>Continue to build an estimate, or browse the study library.</p><a class="button-link" href="study.html">Browse study topics →</a>`
-  : importedLesson?`<p>Review a lesson linked to a question you missed.</p><a class="button-link" href="study.html?lesson=${encodeURIComponent(importedLesson)}">Open recommended lesson →</a>`
+  : importedLesson?`<p><b>${mahymEscape(mahymTopics[importedLesson]??'Recommended lesson')}</b><br>Linked to a question you missed.</p><a class="button-link" href="study.html?lesson=${encodeURIComponent(importedLesson)}">Open recommended lesson →</a>`
+  : focus && !priority?.concept?`<p>${tips[focus.id][0]}</p><a class="button-link" href="${origin}/${links[focus.id]}">Open ${skills[focus.id].toLowerCase()} resources →</a>`
   : plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><a class="button-link" href="${origin}/${plan.route}">Open lesson library →</a>`
   : overall.band===0?`<p>Start with foundational Japanese.</p><a class="button-link" href="${origin}/materials">Open beginner lessons →</a>`
-  : `<p>Practice at your estimated level.</p><a class="button-link" href="${drill}">Open ${label(reference)} drills →</a>`}
+  : `<p>Practice at your estimated level.</p><a class="button-link" href="${drill}">Open ${label(reference)} drills →</a>`}</li>
+  <li><strong>2 · Practice</strong><p>${importedLesson?'Try the lesson exercises before revealing the answers.':'Apply the rule to a few new examples.'}</p>
+  ${hasEstimate && importedLesson?`<a href="study.html?lesson=${encodeURIComponent(importedLesson)}#lesson-exercises">Open lesson exercises →</a>`:`<a href="${hasEstimate?drill:'study.html'}">Open practice →</a>`}</li>
+  <li><strong>3 · Check again</strong><p>${diagnosis.confirmed?'Use the delayed follow-up to check this distinction in new sentences.':'Answer fresh placement questions to refine the estimate.'}</p>
+  ${diagnosis.confirmed && (followup || eligibleForTransfer)?'<button class="secondary" data-action="transfer">Open follow-up</button>':more?'<button class="secondary" data-action="continue">Continue test</button>':''}</li></ol>
   <details class="extra-study"><summary>More study options</summary><a href="study.html">Browse the study library</a> · <a href="${drill}">${label(reference)} external drills</a></details></section>
-  <div class="reportgrid"><section class="panel result-section" id="skills" tabindex="-1"><h2>Skill map</h2>${evidence}<small>Estimated readiness at ${label(reference)}. The shaded bands show model uncertainty.</small>
+  <div class="reportgrid"><section class="panel result-section" id="skills" tabindex="-1"><h2>Skill comparison</h2>${categoryBars}<small>Estimated performance on questions around ${label(reference)}. Grammar averages its measured subskills.</small>
+  <details><summary>Detailed skill ranges</summary>${evidence}<small>The shaded bands show model uncertainty.</small></details>
   <details><summary>Radar overview</summary>${radar(skill)}</details></section>
   <section class="panel"><h2>Evidence by level</h2>${bands.slice(1).map(band=>bar(label(band),tally(placement.filter(entry=>difficulty(bank[entry.id])===band)))).join('')}
   <details><summary>What this test measures</summary>

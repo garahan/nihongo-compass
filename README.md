@@ -77,3 +77,7 @@ The displayed band is the posterior median, which minimizes expected absolute ba
 The report opens after 12 total responses. It withholds a level label until at least four independent placement answers have been chosen and distinguishes early, provisional, and focused evidence. Focused describes the evidence within this model. It does not certify a JLPT level.
 
 Run `node test/simulate-placement.cjs` for seeded even, uneven, and noisy synthetic profiles across all six modeled bands. An earlier engine file can be supplied as the first argument for a before-and-after comparison. Simulation evaluates model behavior under assumptions and cannot establish performance on real learners.
+
+### Reading the results
+
+The level chart shows relative model support across placement bands. Display rounding preserves a 100% total. Skill cards show estimated readiness at the current reference level. Grammar averages measured subskills, and partial coverage is labeled. The study priority uses chosen misses within one band of the reference, with smoothing for small samples. The review, practice, and check-again path uses a linked Mahym lesson when one matches the skill and falls back to existing study material.

@@ -57,8 +57,13 @@ function showLesson(lesson) {
     exercise(listening,text);
   }
   const practice = disclosure('Lesson exercises',panel);
+  practice.id = 'lesson-exercises';
   for (const q of lesson.questions??[]) exercise(practice,q);
   libraryContent.append(panel);
+  if (location.hash==='#lesson-exercises') {
+    practice.open = true;
+    practice.scrollIntoView();
+  }
 }
 
 function showIndex({lessons,stories,threads}) {
