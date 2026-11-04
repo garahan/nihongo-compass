@@ -63,3 +63,25 @@ const rows = [
 [1,5,'What does 腹を割って話す mean?','To speak frankly and openly|To argue without listening|To talk about food|To speak in riddles','腹を割る is an idiom for opening up honestly.']
 ];
 const bank = rows.map(([level,skill,prompt,options,why],id)=>({id,level,skill,prompt,options:options.split('|'),why}));
+
+// Keep the original IDs, then append each new bank in a fixed script order.
+// A family groups items that share the same contrast set.
+function addLevelItems(level, meanings, readings, usage) {
+  function add(skill,prompt,options,why,offset,family) {
+    bank.push({id:bank.length,level,skill,prompt,options,why,offset,family});
+  }
+  meanings.forEach(([word,reading,meaning],index)=>{
+    const start = index-index%4;
+    const distractors = meanings.slice(start,start+4).filter((_,i)=>i!==index%4).map(row=>row[2]);
+    add(0,'What does '+word+' mean?',[meaning,...distractors],
+      word+(word===reading?'':'（'+reading+'）')+' means '+meaning.charAt(0).toLowerCase()+meaning.slice(1)+'.',
+      -.16,'n'+level+'-meaning-'+start);
+  });
+  readings.forEach(([word,reading,distractors,meaning])=>{
+    add(1,'How is '+word+' read?',[reading,...distractors.split('|')],
+      word+' is read '+reading+' and means '+meaning.charAt(0).toLowerCase()+meaning.slice(1)+'.',0);
+  });
+  usage.forEach(([skill,prompt,options,why])=>{
+    add(skill,prompt,options.split('|'),why,skill===2 || skill===4 ? .18 : 0);
+  });
+}

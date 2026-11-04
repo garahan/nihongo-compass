@@ -1,13 +1,25 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','transfer','engine','blueprint','session'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','transfer','engine','blueprint','session'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
-  assert.equal(bank.length,73);
+  assert.equal(bank.length,273);
+  assert.equal(new Set(bank.map(q=>q.prompt)).size,bank.length);
+  for (const level of [1,2,3,4,5]) {
+    const items = bank.filter(q=>q.level===level && !isTransferItem(q.id));
+    assert(items.length>=50);
+    for (let skill=0;skill<skills.length;skill++) {
+      assert(items.filter(q=>q.skill===skill).length>=6);
+    }
+  }
   for (const [id,q] of bank.entries()) {
     assert.equal(q.id,id);
     assert.equal(new Set(q.options).size,4);
+    assert(q.why.length>0 && q.options.every(option=>option.trim().length>0));
     if (q.concept) assert(concepts[q.concept]);
+  }
+  for (const curve of itemCurves) {
+    assert(curve.every((p,i)=>p>.25 && p<.95 && (i===0 || p>curve[i-1])));
   }
   assert.equal(bank[4].concept,'action-place');
   assert.equal(chooseQuestion([],()=>0).level,3);

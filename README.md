@@ -1,6 +1,6 @@
 # Nihongo Compass
 
-A static adaptive Japanese placement test. The current bank contains 73 original vocabulary and grammar questions. Results are provisional and progress is stored locally in the browser.
+A static adaptive Japanese placement test. The current bank contains 273 original vocabulary and grammar questions. Results are provisional and progress is stored locally in the browser.
 
 Open dist/index.html to run locally. Import this repository in Vercel and use the repository root. The checked-in Vercel configuration serves dist directly. The app has no build dependencies or environment variables.
 
@@ -8,7 +8,7 @@ Open dist/index.html to run locally. Import this repository in Vercel and use th
 
 The browser updates an overall estimate and a separate estimate for each skill. It selects unused questions for level information, skill coverage, or a targeted follow-up. Response time and streaks influence selection. A repeated tagged concept after feedback contributes to practice rather than placement. Reports show sparse skills as still checking.
 
-The bank includes 73 items. Six concepts have explicit follow-ups, including a prerequisite probe for permission forms. Untagged items still provide skill-level evidence. Item difficulty is editorial, so results remain provisional until calibrated against independent outcomes.
+The bank includes 273 items. Six concepts have explicit follow-ups, including a prerequisite probe for permission forms. Untagged items still provide skill-level evidence. Item difficulty is editorial, so results remain provisional until calibrated against independent outcomes.
 
 Run the engine checks with `node test/engine.test.cjs`.
 
@@ -32,10 +32,26 @@ The current bank measures language knowledge. The [JLPT level descriptions](http
 
 The first flow distinguishes に for the location of existence from で for the location of an action. Only the distractor that swaps the two particles counts toward this diagnosis. A recommendation requires two matching errors, including at least one independent placement response. A matching mistake can prompt a question from the other side of the contrast.
 
-Two existing question IDs are reserved for a browser-local follow-up, leaving 71 items available to the adaptive test. The check unlocks 24 hours after the learner marks the review complete. It uses a different context for each side of the distinction and reveals the result after both answers. Placement and practice data remain separate from the follow-up. A legacy session that already used a reserved item does not qualify for a fresh check.
+Two existing question IDs are reserved for a browser-local follow-up, leaving 271 items available to the adaptive test. The check unlocks 24 hours after the learner marks the review complete. It uses a different context for each side of the distinction and reveals the result after both answers. Placement and practice data remain separate from the follow-up. A legacy session that already used a reserved item does not qualify for a fresh check.
 
 The follow-up summary uses a Beta(1,1) update and reports only performance on the two items. Its small sample does not establish mastery or improvement. New concepts can reuse the pattern once they have tagged distractors, independent diagnostic items, and reserved transfer items.
 
 ## Resuming a session
 
 The versioned browser session stores recorded answers, the active question, the option order, and whether feedback is showing. Older answer histories are read and migrated on the next write. Resumed question timing is excluded from the pace signal. Before writing, the store checks whether another tab has changed the saved session and reloads on a conflict. If storage is unavailable, progress stays in memory and the quiz shows a notice.
+
+## Live question bank
+
+| Level | Available placement questions |
+| --- | ---: |
+| N5 | 55 |
+| N4 | 56 |
+| N3 | 56 |
+| N2 | 52 |
+| N1 | 52 |
+
+The new level files contain original vocabulary, kanji-reading, particle, word-form, sentence-pattern, and expression items. Each question has four options, an answer key, and an explanation. Two additional items are reserved for the delayed transfer check.
+
+The selector calculates information gain from each item's response curve for both the overall level and the skill being tested. It averages each curve over plausible difficulty values, favors skill coverage, and avoids clustering questions that share distractors. Related answers contribute progressively less independent placement evidence. The item IDs are append-only so saved answers and the reserved follow-up remain compatible.
+
+Difficulty and response curves are editorial defaults. Tests and model-generated simulations verify behavior under assumed response patterns. They do not establish accuracy against independent JLPT or learner outcomes.

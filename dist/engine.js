@@ -16,6 +16,13 @@ const normalize = values => {
 const skillPrior = bands.map(overall=>normalize(bands.map(skill=>
   Math.exp(-.5*((skill-overall)/1.15)**2))));
 const predictions = bands.map(level=>bands.map(ability=>chanceOfCorrect(ability,level)));
+const itemCurves = bank.map(question=>{
+  const center = difficulty(question)+(question.offset??0);
+  // Average over plausible difficulties because these items have editorial
+  // level tags and no empirical calibration yet.
+  return bands.map(ability=>mean([.25,.5,.25],[-.45,0,.45]
+    .map(delta=>chanceOfCorrect(ability,center+delta))));
+});
 
 function credibleRange(weights, mass=.8) {
   let range = [0,bands.length-1];
@@ -54,9 +61,17 @@ function assess(attempts) {
 
   // Skips are evidence of uncertainty, with less weight than a chosen error.
   const likelihoods = evidenceBySkill.map(evidence=>{
-    const log = bands.map(ability=>evidence.reduce((sum,entry)=>{
-      const p = predictions[difficulty(bank[entry.id])][ability];
-      return sum+(entry.choice===null?.55:1)*Math.log(entry.choice===0?p:1-p);
+    const families = new Map();
+    const weighted = evidence.map(entry=>{
+      const family = bank[entry.id].family;
+      const count = family ? families.get(family)??0 : 0;
+      if (family) families.set(family,count+1);
+      // Later items sharing distractors contribute less independent evidence.
+      return {entry,weight:(entry.choice===null?.55:1)/(1+count)};
+    });
+    const log = bands.map(ability=>weighted.reduce((sum,{entry,weight})=>{
+      const p = itemCurves[entry.id][ability];
+      return sum+weight*Math.log(entry.choice===0?p:1-p);
     },0));
     const max = Math.max(...log);
     return log.map(value=>Math.exp(value-max));
@@ -118,10 +133,8 @@ function chooseQuestion(attempts, random = Math.random) {
   const probeConcept = conceptMisses>=2 ? concepts[lastQuestion.concept].prerequisite : null;
   const allowProbe = attempts.length>=3 && !state.practice.includes(attempts.at(-2));
   const stable = Math.max(...state.overall.weights)>=.75;
-  const gains = state.skill.map(gap=>predictions.map(p=>({
-    overall:information(state.overall.weights,gap.conditional.map(row=>mean(row,p))),
-    skill:information(gap.weights,p)
-  })));
+  const recentFamilies = new Set(attempts.slice(-8).map(entry=>bank[entry.id].family).filter(Boolean));
+  const gains = new Map();
   let best;
   let highest = -Infinity;
   for (const q of bank) {
@@ -129,15 +142,24 @@ function chooseQuestion(attempts, random = Math.random) {
     const level = difficulty(q);
     const isPractice = state.taught.has(q.concept);
     const gap = state.skill[q.skill];
+    const curveKey = `${q.skill}:${level}:${q.offset??0}`;
+    if (!gains.has(curveKey)) {
+      const p = itemCurves[q.id];
+      gains.set(curveKey,{
+        overall:information(state.overall.weights,gap.conditional.map(row=>mean(row,p))),
+        skill:information(gap.weights,p)
+      });
+    }
+    const gain = gains.get(curveKey);
     const sameConcept = q.concept && q.concept===lastQuestion?.concept;
     const probe = allowProbe && (last?.choice!==0 || hesitant) && level<=previous &&
       (q.concept===probeConcept || sameConcept);
     const contrast = last && locationMisconception(last) && locationConcepts.has(q.concept) &&
       q.concept!==lastQuestion.concept && !isPractice;
     const score = attempts.length<2 ? -2*Math.abs(level-3)-gap.n :
-      (isPractice ? 0 : (stable?2:5)*gains[q.skill][level].overall +
-        (stable?3:1.5)*gains[q.skill][level].skill) +
+      (isPractice ? 0 : (stable?2:5)*gain.overall + (stable?3:1.5)*gain.skill) +
       .4/(1+gap.n) - .32*Math.abs(level-target) -
+      (recentFamilies.has(q.family) ? .8 : 0) -
       (isPractice ? .7 : 0) + (probe ? 1.05 : 0) + (contrast ? 1.2 : 0) +
       (quick && level===previous+1 ? .15 : 0);
     const tieBroken = score+random()*.04;
