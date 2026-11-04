@@ -6,44 +6,93 @@ function chanceOfCorrect(ability, level) {
   return .25 + .70 / (1 + Math.exp((level-ability)*1.8));
 }
 
-function posterior(attempts, prior = bands.map(()=>1)) {
-  const scores = bands.map(band=>attempts.reduce((sum,entry)=>{
-    const p = chanceOfCorrect(band,difficulty(bank[entry.id]));
-    return sum + Math.log(entry.choice===0?p:1-p);
-  },Math.log(prior[band])));
-  const highest = Math.max(...scores);
-  const weights = scores.map(score=>Math.exp(score-highest));
-  const sum = weights.reduce((a,b)=>a+b,0);
-  return {band:scores.indexOf(highest),weights:weights.map(w=>w/sum)};
+// Six overall bands and six possible ability bands per skill. Conditional on
+// overall ability, the skill likelihoods factor, so no 6^6 grid is needed.
+const mean = (weights,values) => weights.reduce((sum,w,i)=>sum+w*values[i],0);
+const normalize = values => {
+  const sum = values.reduce((a,b)=>a+b,0);
+  return values.map(value=>value/sum);
+};
+const skillPrior = bands.map(overall=>normalize(bands.map(skill=>
+  Math.exp(-.5*((skill-overall)/1.15)**2))));
+const predictions = bands.map(level=>bands.map(ability=>chanceOfCorrect(ability,level)));
+
+function credibleRange(weights, mass=.8) {
+  let range = [0,bands.length-1];
+  let bestMass = 0;
+  for (const low of bands) {
+    let sum = 0;
+    for (let high=low; high<bands.length; high++) {
+      sum += weights[high];
+      if (sum<mass) continue;
+      const span = high-low;
+      const bestSpan = range[1]-range[0];
+      if (span<bestSpan || (span===bestSpan && sum>bestMass)) {
+        range = [low,high];
+        bestMass = sum;
+      }
+      break;
+    }
+  }
+  return range;
 }
 
 function assess(attempts) {
   const taught = new Set();
   const practice = [];
   const placement = [];
+  const evidenceBySkill = skills.map(()=>[]);
   for (const entry of attempts) {
-    const concept = bank[entry.id].concept;
-    (concept && taught.has(concept) ? practice : placement).push(entry);
-    if (concept) taught.add(concept);
+    const q = bank[entry.id];
+    if (q.concept && taught.has(q.concept)) practice.push(entry);
+    else {
+      placement.push(entry);
+      evidenceBySkill[q.skill].push(entry);
+    }
+    if (q.concept) taught.add(q.concept);
   }
-  const overall = posterior(placement);
-  const reference = Math.max(1,overall.band);
-  const skill = skills.map((_,id)=>{
-    const evidence = placement.filter(entry=>bank[entry.id].skill===id);
-    const other = posterior(placement.filter(entry=>bank[entry.id].skill!==id));
-    // Borrow context from other skills without treating them as direct evidence.
-    const prior = other.weights.map(w=>.5/6+.5*w);
-    const model = posterior(evidence,prior);
-    const readiness = model.weights.reduce((sum,w,band)=>sum+w*chanceOfCorrect(band,reference),0);
-    return {n:evidence.length,right:evidence.filter(entry=>entry.choice===0).length,readiness,weights:model.weights};
+
+  // Skips are evidence of uncertainty, with less weight than a chosen error.
+  const likelihoods = evidenceBySkill.map(evidence=>{
+    const log = bands.map(ability=>evidence.reduce((sum,entry)=>{
+      const p = predictions[difficulty(bank[entry.id])][ability];
+      return sum+(entry.choice===null?.55:1)*Math.log(entry.choice===0?p:1-p);
+    },0));
+    const max = Math.max(...log);
+    return log.map(value=>Math.exp(value-max));
+  });
+  const evidenceByOverall = likelihoods.map(likelihood=>
+    skillPrior.map(prior=>mean(prior,likelihood)));
+  const weights = normalize(bands.map(band=>
+    evidenceByOverall.reduce((product,evidence)=>product*evidence[band],1)));
+  const band = weights.indexOf(Math.max(...weights));
+  const overall = {band,weights,range:credibleRange(weights)};
+  const reference = Math.max(1,band);
+  const skill = likelihoods.map((likelihood,id)=>{
+    const conditional = skillPrior.map((prior,overallBand)=>prior.map((w,ability)=>
+      w*likelihood[ability]/evidenceByOverall[id][overallBand]));
+    const marginal = bands.map(ability=>mean(weights,conditional.map(row=>row[ability])));
+    const evidence = evidenceBySkill[id];
+    return {
+      n:evidence.length,
+      right:evidence.filter(entry=>entry.choice===0).length,
+      readiness:mean(marginal,predictions[reference]),
+      weights:marginal,
+      conditional
+    };
   });
   return {overall,reference,placement,practice,taught,skill};
 }
 
-function information(weights, level) {
-  const predictions = bands.map(band=>chanceOfCorrect(band,level));
-  const mean = predictions.reduce((sum,p,i)=>sum+p*weights[i],0);
-  return predictions.reduce((sum,p,i)=>sum+(p-mean)**2*weights[i],0)/(mean*(1-mean));
+function binaryEntropy(p) {
+  return p>0 && p<1 ? -p*Math.log2(p)-(1-p)*Math.log2(1-p) : 0;
+}
+
+function information(weights, probabilities) {
+  // Mutual information in bits: entropy of the predicted answer minus
+  // expected answer entropy given the candidate ability.
+  return Math.max(0,binaryEntropy(mean(weights,probabilities))-
+    mean(weights,probabilities.map(binaryEntropy)));
 }
 
 function chooseQuestion(attempts, random = Math.random) {
@@ -69,6 +118,10 @@ function chooseQuestion(attempts, random = Math.random) {
   const probeConcept = conceptMisses>=2 ? concepts[lastQuestion.concept].prerequisite : null;
   const allowProbe = attempts.length>=3 && !state.practice.includes(attempts.at(-2));
   const stable = Math.max(...state.overall.weights)>=.75;
+  const gains = state.skill.map(gap=>predictions.map(p=>({
+    overall:information(state.overall.weights,gap.conditional.map(row=>mean(row,p))),
+    skill:information(gap.weights,p)
+  })));
   let best;
   let highest = -Infinity;
   for (const q of bank) {
@@ -80,10 +133,10 @@ function chooseQuestion(attempts, random = Math.random) {
     const probe = allowProbe && (last?.choice!==0 || hesitant) && level<=previous &&
       (q.concept===probeConcept || sameConcept);
     const score = attempts.length<2 ? -2*Math.abs(level-3)-gap.n :
-      (stable?1:2)*information(state.overall.weights,level) +
-      (stable?1.2:.6)*information(gap.weights,level) +
-      .65/(1+gap.n) - .55*Math.abs(level-target) -
-      (isPractice ? .85 : 0) + (probe ? 1.25 : 0) +
+      (isPractice ? 0 : (stable?2:5)*gains[q.skill][level].overall +
+        (stable?3:1.5)*gains[q.skill][level].skill) +
+      .4/(1+gap.n) - .32*Math.abs(level-target) -
+      (isPractice ? .7 : 0) + (probe ? 1.05 : 0) +
       (quick && level===previous+1 ? .15 : 0);
     const tieBroken = score+random()*.04;
     if (tieBroken>highest) {

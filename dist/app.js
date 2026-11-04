@@ -116,8 +116,8 @@ function report() {
   const state = assess(attempts);
   const {overall,reference,placement,practice,skill} = state;
   const total = tally(placement);
-  const alternate = bands.filter(band=>band!==overall.band)
-    .sort((a,b)=>overall.weights[b]-overall.weights[a])[0];
+  const [lower,upper] = overall.range;
+  const range = lower===upper ? '' : ` · Estimated range: ${label(lower)}–${label(upper)}`;
   const priority = studyPriority(state);
   const plan = priority?.concept ? concepts[priority.concept] : priority ? {
     title:skills[priority.skill],lesson:tips[priority.skill][0],route:links[priority.skill]
@@ -126,7 +126,7 @@ function report() {
   const missed = attempts.filter(entry=>entry.choice!==0);
   const evidence = skill.map(({n,readiness},id)=>`<div class="bar"><strong>${skills[id]}</strong><span>${n>=2?`${Math.round(readiness*100)}% · ${n} answers`:'Still checking'}</span>${n>=2?`<progress aria-label="${skills[id]} readiness" max="1" value="${readiness}"></progress>`:''}</div>`).join('');
   app.innerHTML = `<section class="panel reporthero"><p class="eyebrow">Your placement · ${attempts.length} answers</p><h1 tabindex="-1">Likely ${label(overall.band)}</h1>
-  <p>${total.right}/${total.n} placement answers correct${overall.weights[overall.band]<.75?` · Also plausible: ${label(alternate)}`:''}</p>
+  <p>${total.right}/${total.n} placement answers correct${range}</p>
   <p>Provisional language-knowledge estimate.${practice.length?` ${practice.length} follow-up answers tracked separately as practice.`:''}</p>
   <div class="actions">${attempts.length<max?'<button data-action="continue">Continue test</button>':'<span>All available questions answered.</span>'}<button class="secondary" data-action="restart">Start over</button></div></section>
   <div class="reportgrid"><section class="panel"><h2>Skill map</h2>${radar(skill)}${evidence}<small>Estimated readiness at ${label(reference)}, based on question difficulty and answers.</small></section>

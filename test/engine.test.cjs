@@ -25,6 +25,15 @@ vm.runInNewContext(source+`
   const advanced = assess([attempt(48,0),attempt(49,0)]);
   assert(advanced.skill[0].readiness>=0 && advanced.skill[0].readiness<=1);
   assert(advanced.overall.weights[5]>regular.overall.weights[5]);
+  assert.deepEqual(credibleRange([.01,.03,.12,.7,.12,.02]),[2,3]);
+  assert.equal(information([.5,.5],[.7,.7]),0);
+  assert(information([.5,.5],[.3,.9])>information([.5,.5],[.5,.7]));
+  const skip = assess([attempt(0,null)]);
+  const wrong = assess([attempt(0,1)]);
+  assert(skip.overall.weights[0]<wrong.overall.weights[0]);
+  for (const distribution of [advanced.overall.weights,...advanced.skill.map(s=>s.weights)]) {
+    assert(Math.abs(distribution.reduce((sum,w)=>sum+w,0)-1)<1e-10);
+  }
   for (const [choice,expected] of [[0,5],[null,0]]) {
     const answers=[];
     const ids=new Set();
