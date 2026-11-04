@@ -152,10 +152,10 @@ function radar(data) {
     const [x,y]=point(i,77);
     const [tx,ty]=point(i,105);
     const [dx,dy]=point(i,77*readiness);
-    return `<line x1="180" y1="130" x2="${x}" y2="${y}" stroke="#d4dfd4"/><text x="${tx}" y="${ty+4}" text-anchor="middle" font-size="11" fill="#52625a">${skills[i]}</text>${n>=2?`<circle cx="${dx}" cy="${dy}" r="5" fill="#1d574a"/>`:''}`;
+    return `<line x1="180" y1="130" x2="${x}" y2="${y}" stroke="#d5ddef"/><text x="${tx}" y="${ty+4}" text-anchor="middle" font-size="11" fill="#535d73">${skills[i]}</text>${n>=2?`<circle cx="${dx}" cy="${dy}" r="5" fill="#304ba4"/>`:''}`;
   }).join('');
   const measured = data.every(row=>row.n>=2);
-  return `<svg viewBox="0 0 360 260" role="img" aria-label="Radar chart of estimated skill readiness at your working level.">${[19,38,58,77].map(r=>`<polygon points="${ring(r)}" fill="none" stroke="#d4dfd4"/>`).join('')}${measured?`<polygon points="${data.map(({readiness},i)=>point(i,77*readiness).join(',')).join(' ')}" fill="#b5d9c1" fill-opacity=".65" stroke="#59816c"/>`:''}${axes}</svg>`;
+  return `<svg viewBox="0 0 360 260" role="img" aria-label="Radar chart of estimated skill readiness at your working level.">${[19,38,58,77].map(r=>`<polygon points="${ring(r)}" fill="none" stroke="#d5ddef"/>`).join('')}${measured?`<polygon points="${data.map(({readiness},i)=>point(i,77*readiness).join(',')).join(' ')}" fill="#c4d0fa" fill-opacity=".65" stroke="#647cbe"/>`:''}${axes}</svg>`;
 }
 
 function bar(name,{n,right}) {
