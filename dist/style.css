@@ -93,3 +93,67 @@ progress { appearance: none; border: 0; border-radius: 20px; background: var(--s
 progress::-webkit-progress-bar { background: var(--soft); }
 progress::-webkit-progress-value { background: var(--accent); border-radius: 20px; }
 progress::-moz-progress-bar { background: var(--accent); border-radius: 20px; }
+
+/* The compass palette carries through placement, evidence and follow-up. */
+:root {
+  --page: #f5f4ed;
+  --paper: #fffef9;
+  --ink: #192f2a;
+  --muted: #52625a;
+  --line: #d9e1d5;
+  --accent: #1d574a;
+  --soft: #e8f2e9;
+  --focus: #a14026;
+  --warm: #fff0df;
+}
+body { background: radial-gradient(ellipse at 50% 0%, #e8efe3 0, transparent 480px), var(--page); }
+.site-header { background: #fffef9; }
+.header-inner { max-width: 1080px; }
+.brand { gap: 11px; font-size: 1.05rem; }
+.mark { width: 40px; height: 40px; }
+.header-label { padding: 5px 11px; border-radius: 99px; background: var(--soft); color: var(--accent); font-weight: 720; }
+main { max-width: 1080px; }
+h1 { letter-spacing: -.048em; }
+.panel { border-radius: 22px; }
+.welcome,.quiz { box-shadow: 0 16px 45px #2546380d; }
+.welcome { display: grid; grid-template-columns: minmax(0,1fr) minmax(220px,.64fr); max-width: 920px; gap: clamp(24px,4vw,54px); align-items: center; }
+.welcome h1 { font-size: clamp(2.2rem,6vw,3.9rem); margin-bottom: 14px; line-height: 1.02; }
+.welcome .eyebrow { color: var(--accent); margin-bottom: 14px; }
+.levels li { border-radius: 99px; padding-block: 6px; }
+.route { list-style: none; margin: 0; padding: 20px; border-radius: 16px; background: #f0f5eb; }
+.route li { position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; }
+.route li:not(:last-child)::after { content: ''; position: absolute; left: 15px; top: 42px; bottom: -10px; border-left: 1px solid #a4b8a6; }
+.route li > span { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; background: var(--paper); color: var(--accent); font-size: .72rem; font-weight: 800; }
+.route small { margin: 1px 0 0; line-height: 1.4; }
+button:not(:disabled):hover,.button-link:hover { background: #164439; }
+.secondary:not(:disabled):hover,.button-link.secondary:hover,.quiet:not(:disabled):hover { background: var(--soft); }
+.option:not(:disabled):hover { background: var(--soft); border-color: #87a99a; }
+.option-key { background: #eff2e9; }
+.option.right .option-key { background: #d7eadc; color: #194d31; }
+.option.wrong .option-key { background: #fae0d9; color: #762f23; }
+.feedback { border-left: 3px solid #6e9a81; background: var(--soft); }
+.feedback[data-outcome="Incorrect"],.feedback[data-outcome="Skipped"] { border-color: #bb6c47; background: var(--warm); }
+.result-head { background: #163b35; border-color: #163b35; }
+.result-head p,.result-head small { color: #e0eee2; }
+.result-head button:not(.secondary) { background: #e3f4db; color: #173a31; }
+.result-head h1 { font-size: clamp(2.35rem,7vw,4.05rem); margin-bottom: 10px; }
+.result-nav { gap: 8px; margin: 14px 0; padding: 0; }
+.result-nav a { padding-inline: 14px; border-radius: 99px; background: var(--paper); border: 1px solid var(--line); text-decoration: none; }
+.result-nav a:hover { background: var(--soft); }
+#study { border-left: 4px solid #b96e47; }
+.keyboard-hint { margin-top: 12px; font-size: .78rem; }
+@media(max-width: 680px) {
+  .welcome { grid-template-columns: 1fr; gap: 22px; }
+  .welcome h1 { max-width: 12ch; }
+  .route { padding: 12px 16px; }
+}
+@media (hover:none) { .keyboard-hint { display: none; } }
+@media (prefers-reduced-motion:no-preference) {
+  button,.button-link,.result-nav a { transition: background-color 140ms ease,border-color 140ms ease; }
+  button:not(:disabled):active,.button-link:active { transform: translateY(1px); }
+  .feedback { animation: feedback-in 150ms ease-out; }
+  @keyframes feedback-in { from { opacity: .45; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+}
+
+/* Screen titles receive programmatic focus; controls retain a visible ring. */
+h1[tabindex="-1"]:focus { outline: none; }

@@ -1,4 +1,5 @@
 const app = document.querySelector('#app');
+const stage = document.querySelector('#stage');
 const key = 'nihongo-compass-result-v1';
 const transferKey = 'nihongo-compass-transfer-v1';
 const min = 12;
@@ -74,6 +75,7 @@ function focusHeading() {
 }
 
 function welcome() {
+  stage.textContent = 'Japanese placement';
   app.replaceChildren(document.querySelector('#welcome').content.cloneNode(true));
   app.querySelector('[data-action=latest]').hidden = !latest || latest.length < min;
   if (latest?.length) app.querySelector('[data-progress]').textContent =
@@ -92,6 +94,7 @@ function welcome() {
 }
 
 function showQuestion() {
+  stage.textContent = 'Assessment';
   const entry = graded ? attempts.at(-1) : null;
   const number = attempts.length + (graded ? 0 : 1);
   const answerText = entry?.choice === null ? 'Skipped' : entry?.choice === 0 ? 'Correct' : 'Incorrect';
@@ -103,10 +106,11 @@ function showQuestion() {
   <div class="milestone"><small>${attempts.length<min ? `${attempts.length} of ${min} answers for first results` : `${attempts.length} answers saved`}</small>
   ${attempts.length<min ? `<progress aria-label="Progress toward first results" value="${attempts.length}" max="${min}"></progress>` : ''}</div>
   <h1 tabindex="-1" id="question" class="jp">${prompt}</h1>
-  <div class="options">${options.map((choice,index)=>`<button class="option ${graded && choice===0?'right':graded && choice===entry.choice?'wrong':''}" data-choice="${choice}" ${graded?'disabled':''}><span class="option-key" aria-hidden="true">${String.fromCharCode(65+index)}</span><span class="option-text">${item.options[choice]}</span>${graded && choice===0?'<span class="option-mark">Correct</span>':graded && choice===entry.choice?'<span class="option-mark">Your answer</span>':''}</button>`).join('')}</div>
-  ${graded?`<p class="feedback" role="status" tabindex="-1"><strong>${answerText}.</strong> ${item.why}</p>`:''}
+  <div class="options">${options.map((choice,index)=>`<button class="option ${graded && choice===0?'right':graded && choice===entry.choice?'wrong':''}" data-choice="${choice}" ${graded?'disabled':'aria-keyshortcuts="Alt+'+(index+1)+'"'}><span class="option-key" aria-hidden="true">${index+1}</span><span class="option-text">${item.options[choice]}</span>${graded && choice===0?'<span class="option-mark">Correct</span>':graded && choice===entry.choice?'<span class="option-mark">Your answer</span>':''}</button>`).join('')}</div>
+  ${graded?`<p class="feedback" data-outcome="${answerText}" role="status" tabindex="-1"><strong>${answerText}.</strong> ${item.why}</p>`:''}
   <div class="actions">${graded?(canContinue()?'<button data-action="next">Next question →</button>':''):'<button class="secondary" data-action="skip">Skip question</button>'}
-  ${attempts.length>=min?`<button class="${canContinue()?'secondary':''}" data-action="finish">View results</button>`:''}</div></section>`;
+  ${attempts.length>=min?`<button class="${canContinue()?'secondary':''}" data-action="finish">View results</button>`:''}</div>
+  ${graded?'':'<small class="keyboard-hint">Keyboard shortcut: Alt / Option + 1–4</small>'}</section>`;
   if (graded) app.querySelector('.feedback').focus();
   else focusHeading();
 }
@@ -127,10 +131,10 @@ function radar(data) {
     const [x,y]=point(i,77);
     const [tx,ty]=point(i,105);
     const [dx,dy]=point(i,77*readiness);
-    return `<line x1="180" y1="130" x2="${x}" y2="${y}" stroke="#d4d0e7"/><text x="${tx}" y="${ty+4}" text-anchor="middle" font-size="11" fill="#535c72">${skills[i]}</text>${n>=2?`<circle cx="${dx}" cy="${dy}" r="5" fill="#4637a5"/>`:''}`;
+    return `<line x1="180" y1="130" x2="${x}" y2="${y}" stroke="#d4dfd4"/><text x="${tx}" y="${ty+4}" text-anchor="middle" font-size="11" fill="#52625a">${skills[i]}</text>${n>=2?`<circle cx="${dx}" cy="${dy}" r="5" fill="#1d574a"/>`:''}`;
   }).join('');
   const measured = data.every(row=>row.n>=2);
-  return `<svg viewBox="0 0 360 260" role="img" aria-label="Radar chart of estimated skill readiness at your working level.">${[19,38,58,77].map(r=>`<polygon points="${ring(r)}" fill="none" stroke="#d4d0e7"/>`).join('')}${measured?`<polygon points="${data.map(({readiness},i)=>point(i,77*readiness).join(',')).join(' ')}" fill="#d1c7fa" fill-opacity=".65" stroke="#6b58bb"/>`:''}${axes}</svg>`;
+  return `<svg viewBox="0 0 360 260" role="img" aria-label="Radar chart of estimated skill readiness at your working level.">${[19,38,58,77].map(r=>`<polygon points="${ring(r)}" fill="none" stroke="#d4dfd4"/>`).join('')}${measured?`<polygon points="${data.map(({readiness},i)=>point(i,77*readiness).join(',')).join(' ')}" fill="#b5d9c1" fill-opacity=".65" stroke="#59816c"/>`:''}${axes}</svg>`;
 }
 
 function bar(name,{n,right}) {
@@ -138,6 +142,7 @@ function bar(name,{n,right}) {
 }
 
 function report() {
+  stage.textContent = 'Results';
   const state = assess(attempts);
   const {overall,reference,placement,practice,skill} = state;
   const coverage = assessmentCoverage(placement,bank);
@@ -181,6 +186,7 @@ function report() {
 }
 
 function showFollowup() {
+  stage.textContent = 'Follow-up';
   const state = transferState(followup,Date.now());
   let body;
   if (state==='none') {
@@ -259,4 +265,14 @@ app.addEventListener('click', event=>{
     case 'home': welcome(); break;
   }
 });
+document.addEventListener('keydown', event=>{
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.repeat ||
+      event.defaultPrevented || !/^Digit[1-4]$/.test(event.code)) return;
+  const choices = app.querySelectorAll('.quiz button[data-choice]:not(:disabled)');
+  const choice = choices[Number(event.code.at(-1))-1];
+  if (!choice) return;
+  event.preventDefault();
+  choice.click();
+});
+
 welcome();
