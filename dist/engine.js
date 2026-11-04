@@ -125,18 +125,20 @@ function chooseQuestion(attempts, random = Math.random) {
   let best;
   let highest = -Infinity;
   for (const q of bank) {
-    if (seen.has(q.id)) continue;
+    if (seen.has(q.id) || isTransferItem(q.id)) continue;
     const level = difficulty(q);
     const isPractice = state.taught.has(q.concept);
     const gap = state.skill[q.skill];
     const sameConcept = q.concept && q.concept===lastQuestion?.concept;
     const probe = allowProbe && (last?.choice!==0 || hesitant) && level<=previous &&
       (q.concept===probeConcept || sameConcept);
+    const contrast = last && locationMisconception(last) && locationConcepts.has(q.concept) &&
+      q.concept!==lastQuestion.concept && !isPractice;
     const score = attempts.length<2 ? -2*Math.abs(level-3)-gap.n :
       (isPractice ? 0 : (stable?2:5)*gains[q.skill][level].overall +
         (stable?3:1.5)*gains[q.skill][level].skill) +
       .4/(1+gap.n) - .32*Math.abs(level-target) -
-      (isPractice ? .7 : 0) + (probe ? 1.05 : 0) +
+      (isPractice ? .7 : 0) + (probe ? 1.05 : 0) + (contrast ? 1.2 : 0) +
       (quick && level===previous+1 ? .15 : 0);
     const tieBroken = score+random()*.04;
     if (tieBroken>highest) {

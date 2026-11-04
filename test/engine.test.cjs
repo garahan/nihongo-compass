@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','engine','blueprint'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','transfer','engine','blueprint'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
   assert.equal(bank.length,73);
   for (const [id,q] of bank.entries()) {
@@ -12,6 +12,19 @@ vm.runInNewContext(source+`
   assert.equal(bank[4].concept,'action-place');
   assert.equal(chooseQuestion([],()=>0).level,3);
   const attempt = (id,choice)=>({id,choice,seconds:5});
+  const misdiagnosed = assess([attempt(4,2),attempt(60,1)]);
+  assert.equal(locationDiagnosis(misdiagnosed).confirmed,false);
+  assert.equal(locationDiagnosis(assess([attempt(4,1),attempt(62,1)])).confirmed,true);
+  assert.equal(locationDiagnosis(assess([attempt(4,1),attempt(60,0)])).confirmed,false);
+  assert.equal(locationDiagnosis(assess([attempt(4,1),attempt(60,1)])).practice,1);
+  const checkpoint = {id:transferProbe.id,readyAt:100,answers:[]};
+  assert.equal(transferState(checkpoint,99),'waiting');
+  assert.equal(transferState(checkpoint,100),'ready');
+  assert.equal(transferState({...checkpoint,answers:[attempt(64,0)]},100),'none');
+  assert.equal(transferState({...checkpoint,answers:[attempt(61,0),attempt(64,0)]},100),'complete');
+  assert.equal(transferEvidence([attempt(61,0),attempt(64,0)]).aboveHalf,.875);
+  assert.equal(transferEvidence([attempt(61,1),attempt(64,0)]).aboveHalf,.5);
+  assert.equal(transferEvidence([attempt(61,1),attempt(64,1)]).aboveHalf,.125);
   const domainRows = assessmentCoverage([attempt(0,0),attempt(1,null)],bank);
   const knowledge = domainRows.find(domain=>domain.id==='knowledge');
   assert.equal(knowledge.skills[0].status,'needs-evidence');
@@ -45,9 +58,10 @@ vm.runInNewContext(source+`
   for (const [choice,expected] of [[0,5],[null,0]]) {
     const answers=[];
     const ids=new Set();
-    while (answers.length<bank.length) {
+    while (answers.length<bank.length-transferProbe.holdouts.length) {
       const question=chooseQuestion(answers,()=>0);
       assert(!ids.has(question.id));
+      assert(!isTransferItem(question.id));
       ids.add(question.id);
       answers.push(attempt(question.id,choice));
       if (answers.length===12) assert.equal(assess(answers).overall.band,expected);

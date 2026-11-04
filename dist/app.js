@@ -1,5 +1,6 @@
 const app = document.querySelector('#app');
 const key = 'nihongo-compass-result-v1';
+const transferKey = 'nihongo-compass-transfer-v1';
 const min = 12;
 const max = bank.length;
 let shownAt = performance.now();
@@ -12,6 +13,21 @@ let item;
 let options;
 let graded = false;
 let latest;
+let followup;
+try {
+  const saved = JSON.parse(localStorage.getItem(transferKey));
+  if (validTransfer(saved)) followup = saved;
+} catch {}
+
+function canContinue(list = attempts) {
+  const seen = new Set(list.map(entry=>entry.id));
+  return bank.some(q=>!isTransferItem(q.id) && !seen.has(q.id));
+}
+
+function saveFollowup(record) {
+  followup = record;
+  try { localStorage.setItem(transferKey,JSON.stringify(record)); } catch {}
+}
 function save() {
   latest = attempts.slice();
   try { localStorage.setItem(key,JSON.stringify(latest)); } catch {}
@@ -44,6 +60,7 @@ function shuffle(values) {
 
 function next() {
   item = chooseQuestion(attempts);
+  if (!item) return report();
   options = shuffle([0,1,2,3]);
   graded = false;
   shownAt = performance.now();
@@ -61,11 +78,12 @@ function welcome() {
   app.querySelector('[data-action=latest]').hidden = !latest || latest.length < min;
   if (latest?.length) app.querySelector('[data-progress]').textContent =
     `${latest.length} answers saved on this device`;
-  if (latest?.length && latest.length < max) {
+  app.querySelector('[data-action=transfer]').hidden = !followup;
+  if (latest?.length && canContinue(latest)) {
     const start = app.querySelector('[data-action=start]');
     start.textContent = 'Continue test';
     start.dataset.action = 'resume';
-  } else if (latest?.length === max) {
+  } else if (latest?.length) {
     const start = app.querySelector('[data-action=start]');
     start.textContent = 'Start over';
     start.dataset.action = 'restart';
@@ -87,8 +105,8 @@ function showQuestion() {
   <h1 tabindex="-1" id="question" class="jp">${prompt}</h1>
   <div class="options">${options.map((choice,index)=>`<button class="option ${graded && choice===0?'right':graded && choice===entry.choice?'wrong':''}" data-choice="${choice}" ${graded?'disabled':''}><span class="option-key" aria-hidden="true">${String.fromCharCode(65+index)}</span><span class="option-text">${item.options[choice]}</span>${graded && choice===0?'<span class="option-mark">Correct</span>':graded && choice===entry.choice?'<span class="option-mark">Your answer</span>':''}</button>`).join('')}</div>
   ${graded?`<p class="feedback" role="status" tabindex="-1"><strong>${answerText}.</strong> ${item.why}</p>`:''}
-  <div class="actions">${graded?(attempts.length<max?'<button data-action="next">Next question →</button>':''):'<button class="secondary" data-action="skip">Skip question</button>'}
-  ${attempts.length>=min?`<button class="${attempts.length===max?'':'secondary'}" data-action="finish">View results</button>`:''}</div></section>`;
+  <div class="actions">${graded?(canContinue()?'<button data-action="next">Next question →</button>':''):'<button class="secondary" data-action="skip">Skip question</button>'}
+  ${attempts.length>=min?`<button class="${canContinue()?'secondary':''}" data-action="finish">View results</button>`:''}</div></section>`;
   if (graded) app.querySelector('.feedback').focus();
   else focusHeading();
 }
@@ -127,6 +145,8 @@ function report() {
   const [lower,upper] = overall.range;
   const range = lower===upper ? '' : ` · Estimated range: ${label(lower)}–${label(upper)}`;
   const priority = studyPriority(state);
+  const diagnosis = locationDiagnosis(state);
+  const eligibleForTransfer = !attempts.some(entry=>isTransferItem(entry.id));
   const plan = priority?.concept ? concepts[priority.concept] : priority ? {
     title:skills[priority.skill],lesson:tips[priority.skill][0],route:links[priority.skill]
   } : null;
@@ -136,10 +156,12 @@ function report() {
   app.innerHTML = `<section class="panel result-head"><p class="eyebrow">Your placement · ${attempts.length} answers</p><h1 tabindex="-1">Likely ${label(overall.band)}</h1>
   <p>${total.right}/${total.n} placement answers correct${range}</p>
   <p>Provisional estimate for language knowledge.${practice.length?` ${practice.length} follow-up answers tracked separately as practice.`:''}</p>
-  <div class="actions">${attempts.length<max?'<button data-action="continue">Continue test →</button>':'<span>All available questions answered.</span>'}</div></section>
+  <div class="actions">${canContinue()?'<button data-action="continue">Continue test →</button>':'<span>All available placement questions answered.</span>'}</div></section>
   <nav class="result-nav" aria-label="Results sections"><a href="#study">Study next</a><a href="#skills">Skill map</a><a href="#review">Missed questions (${missed.length})</a></nav>
   <section class="panel result-section" id="study" tabindex="-1"><h2>Study next</h2>
-  ${plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><p><a href="${origin}/${plan.route}">Open lesson library →</a></p>`:'<p>Continue the test to identify a specific study priority.</p>'}
+  ${diagnosis.confirmed ? `<h3>${transferProbe.title}</h3><p>You chose the other location particle in ${diagnosis.placement+diagnosis.practice} sentences. ${transferProbe.explanation}</p><p><a href="${origin}/grammar">Open grammar library →</a></p>
+  ${followup || eligibleForTransfer ? '<button class="secondary" data-action="transfer">Review and follow up</button>' : '<small>Fresh follow-up items are unavailable for this saved session.</small>'}`
+  : plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><p><a href="${origin}/${plan.route}">Open lesson library →</a></p>`:'<p>Continue the test to identify a specific study priority.</p>'}
   <div class="actions">${overall.band===0?`<a class="button-link secondary" href="${origin}/materials">Open beginner lessons</a>`:''}<a class="button-link secondary" href="${drill}">Open ${label(reference)} drills →</a></div><small>Resources from Nihongo to Japan.</small></section>
   <div class="reportgrid"><section class="panel result-section" id="skills" tabindex="-1"><h2>Skill map</h2>${radar(skill)}${evidence}<small>Estimated readiness at ${label(reference)}, based on question difficulty and answers.</small></section>
   <section class="panel"><h2>Evidence by level</h2>${bands.slice(1).map(band=>bar(label(band),tally(placement.filter(entry=>difficulty(bank[entry.id])===band)))).join('')}
@@ -158,6 +180,33 @@ function report() {
   focusHeading();
 }
 
+function showFollowup() {
+  const state = transferState(followup,Date.now());
+  let body;
+  if (state==='none') {
+    body = `<p>${transferProbe.explanation}</p><button data-action="arm-transfer">I’ve reviewed this</button><small>Two fresh questions unlock in 24 hours.</small>`;
+  } else if (state==='waiting') {
+    body = `<p>Return after ${new Date(followup.readyAt).toLocaleString()} to answer two fresh questions.</p>`;
+  } else if (state==='ready') {
+    const q = bank[transferProbe.holdouts[followup.answers.length]];
+    body = `<p class="eyebrow">Question ${followup.answers.length+1} of ${transferProbe.holdouts.length}</p>
+      <h2>${q.prompt}</h2><div class="options">${shuffle([0,1,2,3]).map(choice=>
+        `<button class="option" data-transfer-item="${q.id}" data-transfer-choice="${choice}">${q.options[choice]}</button>`
+      ).join('')}</div>`;
+  } else {
+    const evidence = transferEvidence(followup.answers);
+    const summary = evidence.aboveHalf>=.85 ? 'You applied the distinction in both new contexts.'
+      : evidence.aboveHalf<=.15 ? 'Both new contexts still need review.'
+      : 'You applied the distinction in one context. More evidence is needed.';
+    body = `<p><strong>${evidence.correct}/${evidence.total} correct.</strong> ${summary}</p>
+      <p>${transferProbe.explanation}</p><small>This check is separate from your placement estimate.</small>`;
+  }
+  app.innerHTML = `<section class="quiz panel"><p class="eyebrow">Follow-up check</p>
+    <h1 tabindex="-1">${state==='ready'?'Location particles':transferProbe.title}</h1>
+    ${body}<div class="actions"><button class="quiet" data-action="home">Back to start</button></div></section>`;
+  focusHeading();
+}
+
 app.addEventListener('click', event=>{
   const sectionLink = event.target.closest('.result-nav a');
   if (sectionLink && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
@@ -169,11 +218,29 @@ app.addEventListener('click', event=>{
   }
   const button = event.target.closest('button');
   if (!button || button.disabled) return;
+  if (button.dataset.transferItem !== undefined) {
+    const id = Number(button.dataset.transferItem);
+    const choice = Number(button.dataset.transferChoice);
+    if (transferState(followup,Date.now())==='ready' &&
+        id===transferProbe.holdouts[followup.answers.length] && [0,1,2,3].includes(choice)) {
+      saveFollowup({...followup,answers:[...followup.answers,{id,choice}]});
+      showFollowup();
+    }
+    return;
+  }
   if (button.dataset.choice !== undefined) grade(Number(button.dataset.choice));
   switch(button.dataset.action){
     case 'start': attempts=[]; next(); break;
     case 'resume': attempts=latest.slice(); next(); break;
-    case 'continue': if(attempts.length<max) next(); break;
+    case 'continue': if(canContinue()) next(); break;
+    case 'transfer': showFollowup(); break;
+    case 'arm-transfer':
+      if (!followup && locationDiagnosis(assess(attempts)).confirmed &&
+          !attempts.some(entry=>isTransferItem(entry.id))) {
+        saveFollowup({id:transferProbe.id,readyAt:Date.now()+transferProbe.delayMs,answers:[]});
+      }
+      showFollowup();
+      break;
     case 'restart':
       if(confirm('Start a new test? This clears the current answers.')){
         attempts=[];
@@ -183,7 +250,7 @@ app.addEventListener('click', event=>{
       break;
     case 'latest': if(latest){attempts=latest.slice(); report();} break;
     case 'skip': grade(null); break;
-    case 'next': if(graded && attempts.length<max) next(); break;
+    case 'next': if(graded && canContinue()) next(); break;
     case 'finish':
       if(attempts.length<min) break;
       report();
