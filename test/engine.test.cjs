@@ -90,9 +90,15 @@ vm.runInNewContext(source+`
   assert.deepEqual(credibleRange([.01,.03,.12,.7,.12,.02]),[2,3]);
   assert.equal(information([.5,.5],[.7,.7]),0);
   assert(information([.5,.5],[.3,.9])>information([.5,.5],[.5,.7]));
+  assert.equal(medianBand([.40,.21,.20,.19,0,0]),1);
+  assert.equal(bandRiskReduction([.5,.5,0,0,0,0],[.6,.6,.6,.6,.6,.6],.5),0);
+  assert(bandRiskReduction([.5,.5,0,0,0,0],[.25,.9,.9,.9,.9,.9],.5)>.25);
   const skip = assess([attempt(0,null)]);
   const wrong = assess([attempt(0,1)]);
+  assert.deepEqual(skip.overall,assess([]).overall);
+  assert(assess([attempt(0,null)],true).overall.weights[0]>skip.overall.weights[0]);
   assert(skip.overall.weights[0]<wrong.overall.weights[0]);
+  assert.equal(skip.quality.sufficient,false);
   for (const distribution of [advanced.overall.weights,...advanced.skill.map(s=>s.weights)]) {
     assert(Math.abs(distribution.reduce((sum,w)=>sum+w,0)-1)<1e-10);
   }
@@ -105,10 +111,11 @@ vm.runInNewContext(source+`
       assert(availableForPlacement(question));
       ids.add(question.id);
       answers.push(attempt(question.id,choice));
-      if (answers.length===12) assert.equal(assess(answers).overall.band,expected);
+      if (answers.length===12) assert.equal(assess(answers,true).overall.band,expected);
     }
     assert.equal(chooseQuestion(bank.map(q=>attempt(q.id,choice))),undefined);
-    assert.equal(assess(answers).overall.band,expected);
+    assert.equal(assess(answers,true).overall.band,expected);
+    if (choice===null) assert.equal(assess(answers).quality.chosen,0);
   }
   console.log('Engine checks passed');
 `,{assert,console});

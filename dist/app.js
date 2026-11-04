@@ -166,11 +166,12 @@ function bar(name,{n,right}) {
 function report() {
   stage.textContent = 'Results';
   const state = assess(attempts);
-  const {overall,reference,placement,practice,skill} = state;
+  const {overall,reference,placement,practice,skill,quality} = state;
   const coverage = assessmentCoverage(placement,bank);
   const total = tally(placement);
   const [lower,upper] = overall.range;
-  const range = lower===upper ? '' : ` · Estimated range: ${label(lower)}–${label(upper)}`;
+  const hasEstimate = quality.chosen>=4;
+  const range = !hasEstimate || lower===upper ? '' : ` · Estimated range: ${label(lower)}–${label(upper)}`;
   const priority = studyPriority(state);
   const importedLesson = mahymRecommendation(placement,reference);
   const diagnosis = locationDiagnosis(state);
@@ -182,7 +183,9 @@ function report() {
   const missed = attempts.filter(entry=>entry.choice!==0);
   const more = canContinue();
   const sparse = skill.findIndex(row=>row.n<2);
-  const continuation = lower!==upper ? `More questions can narrow the ${label(lower)} to ${label(upper)} estimate.`
+  const continuation = !hasEstimate ? 'Choose an answer when you can. Skips help route the test, but a level estimate needs answered questions.'
+    : !quality.sufficient && quality.covered<4 ? 'More questions can give us enough evidence across several skills.'
+    : lower!==upper ? `More questions can narrow the ${label(lower)} to ${label(upper)} estimate.`
     : sparse>=0 ? `More questions can help clarify skills with limited evidence, such as ${skills[sparse].toLowerCase()}.`
     : 'More questions can help verify which skills need the most practice.';
   const evidence = skill.map(({n,readiness,weights},id)=>{
@@ -195,15 +198,16 @@ function report() {
       <div class="skill-track" role="img" aria-label="Model range ${from} to ${to} percent, estimate ${percent} percent">
       <span class="skill-range" style="--from:${from}%;--width:${to-from}%"></span><span class="skill-point" style="--at:${percent}%"></span></div></div>`;
   }).join('');
-  app.innerHTML = `<section class="panel result-head"><p class="eyebrow">Your placement · ${attempts.length} answers</p><h1 tabindex="-1">Likely ${label(overall.band)}</h1>
-  <p>${total.right}/${total.n} placement answers correct${range}</p>
-  <p>Provisional estimate for language knowledge.${practice.length?` ${practice.length} answers tracked separately as practice.`:''}</p>
+  app.innerHTML = `<section class="panel result-head"><p class="eyebrow">Your placement · ${attempts.length} responses</p><h1 tabindex="-1">${hasEstimate?`Likely ${label(overall.band)}`:'More evidence needed'}</h1>
+  <p>${quality.chosen?`${total.right}/${quality.chosen} placement answers correct`:'No placement answers chosen yet'}${range}${total.n>quality.chosen?` · ${total.n-quality.chosen} placement skips`:''}</p>
+  <p>${quality.focused?'Focused language-knowledge estimate.':quality.sufficient?'Provisional language-knowledge estimate.':'Early language-knowledge evidence.'}${practice.length?` ${practice.length} responses tracked separately as practice.`:''}</p>
   <div class="actions">${more?'<button data-action="continue">Continue test →</button>':'<span>All available placement questions answered.</span>'}</div>
   ${more?`<small>${continuation}</small>`:''}</section>
   <nav class="result-nav" aria-label="Results sections"><a href="#study">Study next</a><a href="#skills">Skill map</a><a href="#review">Missed questions (${missed.length})</a></nav>
   <section class="panel result-section" id="study" tabindex="-1"><h2>Study next</h2>
   ${diagnosis.confirmed ? `<h3>${transferProbe.title}</h3><p>You chose the other location particle in ${diagnosis.placement+diagnosis.practice} sentences. ${transferProbe.explanation}</p>
   ${followup || eligibleForTransfer ? '<button data-action="transfer">Review and follow up</button>' : `<a class="button-link" href="${origin}/grammar">Open grammar library →</a>`}`
+  : !hasEstimate?`<p>Continue to build an estimate, or browse the study library.</p><a class="button-link" href="study.html">Browse study topics →</a>`
   : importedLesson?`<p>Review a lesson linked to a question you missed.</p><a class="button-link" href="study.html?lesson=${encodeURIComponent(importedLesson)}">Open recommended lesson →</a>`
   : plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><a class="button-link" href="${origin}/${plan.route}">Open lesson library →</a>`
   : overall.band===0?`<p>Start with foundational Japanese.</p><a class="button-link" href="${origin}/materials">Open beginner lessons →</a>`

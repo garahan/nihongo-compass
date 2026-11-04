@@ -14,7 +14,7 @@ Run the engine checks with `node test/engine.test.cjs`.
 
 ### Scoring model
 
-A Bayesian model uses six ordered placement bands and six skill abilities linked to overall ability. A logistic response curve accounts for four-choice guessing and occasional misses. Skill likelihoods are integrated separately, so estimating the joint model takes only small grids. Chosen answers carry full weight, skips carry partial weight, and follow-ups after teaching a tagged concept stay outside placement.
+A Bayesian model uses six ordered placement bands and six skill abilities linked to overall ability. A logistic response curve accounts for four-choice guessing and occasional misses. Skill likelihoods are integrated separately, so estimating the joint model takes only small grids. Chosen answers supply placement evidence. Skips influence routing only, and follow-ups after teaching a tagged concept stay outside placement.
 
 Question selection uses expected entropy reduction for overall ability and for the question's skill, together with skill coverage and concept probes. The report's estimated range is the shortest contiguous interval containing at least 80% of model probability. These are model-based estimates with hand-set parameters, pending item calibration and independent validation.
 
@@ -69,3 +69,11 @@ Open a checkout of this repository as the project in Codex. The root `AGENTS.md`
 Run `node test/import.test.cjs` from the repository root to validate the imported lesson links, question keys and choices, reading and listening exercises, story panels, and thread content. The raw Mahym snapshot remains unchanged. The shared errata list corrects 29 exercises in the study library, including the seven original answer-key or choice failures. Twenty-two previously scored questions are now practice only, leaving 2,082 Mahym placement items. Their saved IDs remain valid. The model separates subsequent imported answers on the same taught word or linked concept as practice.
 
 These checks cover catalog integrity and the documented corrections. They are not a native-speaker review of every gloss or a calibration study.
+
+### Precision and evidence checks
+
+The displayed band is the posterior median, which minimizes expected absolute band error under the model. Candidate items are ranked using both expected reduction in that decision error and information about overall and skill ability. The test prioritizes diagnosis after the modeled range is one band and independent evidence covers at least 12 chosen answers, four sampled skills, and four near-level answers.
+
+The report opens after 12 total responses. It withholds a level label until at least four independent placement answers have been chosen and distinguishes early, provisional, and focused evidence. Focused describes the evidence within this model. It does not certify a JLPT level.
+
+Run `node test/simulate-placement.cjs` for seeded even, uneven, and noisy synthetic profiles across all six modeled bands. An earlier engine file can be supplied as the first argument for a before-and-after comparison. Simulation evaluates model behavior under assumptions and cannot establish performance on real learners.

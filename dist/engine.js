@@ -14,6 +14,23 @@ const normalize = values => {
   const sum = values.reduce((a,b)=>a+b,0);
   return values.map(value=>value/sum);
 };
+function medianBand(weights) {
+  let cumulative = 0;
+  return bands.find(band=>(cumulative+=weights[band])>=.5) ?? bands.at(-1);
+}
+
+function bandRisk(weights) {
+  const center = medianBand(weights);
+  return mean(weights,bands.map(band=>Math.abs(band-center)));
+}
+
+function bandRiskReduction(weights, probabilities, priorRisk) {
+  const correct = weights.map((weight,band)=>weight*probabilities[band]);
+  const wrong = weights.map((weight,band)=>weight*(1-probabilities[band]));
+  const chance = correct.reduce((sum,weight)=>sum+weight,0);
+  return Math.max(0,priorRisk-chance*bandRisk(normalize(correct))-
+    (1-chance)*bandRisk(normalize(wrong)));
+}
 const skillPrior = bands.map(overall=>normalize(bands.map(skill=>
   Math.exp(-.5*((skill-overall)/1.15)**2))));
 const predictions = bands.map(level=>bands.map(ability=>chanceOfCorrect(ability,level)));
@@ -46,7 +63,7 @@ function credibleRange(weights, mass=.8) {
   return range;
 }
 
-function assess(attempts) {
+function assess(attempts, forRouting = false) {
   const taught = new Set();
   const taughtImported = new Set();
   const practice = [];
@@ -64,10 +81,10 @@ function assess(attempts) {
     if (q.sourceId && q.family) taughtImported.add(q.family);
   }
 
-  // Skips are evidence of uncertainty, with less weight than a chosen error.
+  // Skips guide routing, but a missing answer cannot lower the reported level.
   const likelihoods = evidenceBySkill.map(evidence=>{
     const families = new Map();
-    const weighted = evidence.map(entry=>{
+    const weighted = evidence.filter(entry=>forRouting || entry.choice!==null).map(entry=>{
       const family = bank[entry.id].family;
       const count = family ? families.get(family)??0 : 0;
       if (family) families.set(family,count+1);
@@ -85,7 +102,7 @@ function assess(attempts) {
     skillPrior.map(prior=>mean(prior,likelihood)));
   const weights = normalize(bands.map(band=>
     evidenceByOverall.reduce((product,evidence)=>product*evidence[band],1)));
-  const band = weights.indexOf(Math.max(...weights));
+  const band = medianBand(weights);
   const overall = {band,weights,range:credibleRange(weights)};
   const reference = Math.max(1,band);
   const skill = likelihoods.map((likelihood,id)=>{
@@ -101,7 +118,13 @@ function assess(attempts) {
       conditional
     };
   });
-  return {overall,reference,placement,practice,taught,taughtImported,skill};
+  const chosen = placement.filter(entry=>entry.choice!==null);
+  const covered = skill.filter(row=>row.n>=2).length;
+  const near = chosen.filter(entry=>Math.abs(difficulty(bank[entry.id])-reference)<=1).length;
+  const sufficient = chosen.length>=12 && covered>=4 && near>=4;
+  const focused = sufficient && overall.range[0]===overall.range[1];
+  const quality = {chosen:chosen.length,covered,near,sufficient,focused};
+  return {overall,reference,placement,practice,taught,taughtImported,skill,quality};
 }
 
 function binaryEntropy(p) {
@@ -116,7 +139,7 @@ function information(weights, probabilities) {
 }
 
 function chooseQuestion(attempts, random = Math.random) {
-  const state = assess(attempts);
+  const state = assess(attempts,true);
   const seen = new Set(attempts.map(entry=>entry.id));
   const last = attempts.at(-1);
   const previous = last ? difficulty(bank[last.id]) : 3;
@@ -137,7 +160,8 @@ function chooseQuestion(attempts, random = Math.random) {
     bank[entry.id].concept===lastQuestion.concept && entry.choice!==0).length : 0;
   const probeConcept = conceptMisses>=2 ? concepts[lastQuestion.concept].prerequisite : null;
   const allowProbe = attempts.length>=3 && !state.practice.includes(attempts.at(-2));
-  const stable = Math.max(...state.overall.weights)>=.75;
+  const stable = state.quality.focused;
+  const priorRisk = bandRisk(state.overall.weights);
   const recentFamilies = new Set(attempts.slice(-8).map(entry=>bank[entry.id].family).filter(Boolean));
   const gains = new Map();
   let best;
@@ -151,8 +175,10 @@ function chooseQuestion(attempts, random = Math.random) {
     const curveKey = `${q.skill}:${level}:${q.offset??0}:${Boolean(q.sourceId)}`;
     if (!gains.has(curveKey)) {
       const p = itemCurves[q.id];
+      const overallProbabilities = gap.conditional.map(row=>mean(row,p));
       gains.set(curveKey,{
-        overall:information(state.overall.weights,gap.conditional.map(row=>mean(row,p))),
+        overall:information(state.overall.weights,overallProbabilities),
+        decision:bandRiskReduction(state.overall.weights,overallProbabilities,priorRisk),
         skill:information(gap.weights,p)
       });
     }
@@ -163,8 +189,9 @@ function chooseQuestion(attempts, random = Math.random) {
     const contrast = last && locationMisconception(last) && locationConcepts.has(q.concept) &&
       q.concept!==lastQuestion.concept && !isPractice;
     const score = attempts.length<2 ? -2*Math.abs(level-3)-gap.n :
-      (isPractice ? 0 : (stable?2:5)*gain.overall + (stable?3:1.5)*gain.skill) +
-      .4/(1+gap.n) - .32*Math.abs(level-target) -
+      (isPractice ? 0 : (stable?2:4)*gain.overall + (stable?3:1.5)*gain.skill +
+        (stable?1:4)*gain.decision) +
+      .42/(1+gap.n) - .22*Math.abs(level-target) -
       (recentFamilies.has(q.family) ? .8 : 0) -
       (q.sourceId ? .08 : 0) -
       (isPractice ? .7 : 0) + (probe ? 1.05 : 0) + (contrast ? 1.2 : 0) +
