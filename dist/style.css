@@ -193,3 +193,7 @@ h1[tabindex="-1"]:focus { outline: none; }
   .placement-chart { gap: 4px; }
   .level-column { font-size: .68rem; }
 }
+
+.plan-progress { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 16px 0 22px; padding: 0; }
+.plan-progress li { border: 1px solid var(--line); border-radius: 99px; padding: 5px 10px; color: var(--muted); font-size: .85rem; }
+.plan-progress [aria-current="step"] { color: var(--accent); background: var(--soft); border-color: #a8b9ed; font-weight: 750; }

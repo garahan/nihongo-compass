@@ -81,3 +81,9 @@ Run `node test/simulate-placement.cjs` for seeded even, uneven, and noisy synthe
 ### Reading the results
 
 The level chart shows relative model support across placement bands. Display rounding preserves a 100% total. Skill cards show estimated readiness at the current reference level. Grammar averages measured subskills, and partial coverage is labeled. The study priority uses chosen misses within one band of the reference, with smoothing for small samples. The review, practice, and check-again path uses a linked Mahym lesson when one matches the skill and falls back to existing study material.
+
+### Saved study plans
+
+When a study priority has at least two independent baseline answers in the same skill and level, Compass can save one review → practice → check plan. It reserves four fresh questions at that level, ranks them by closeness to the baseline response curves, and avoids already shown items, related item families, and items from the recommended lesson. A browser-local exposure record persists across test restarts. Checks unlock 24 hours after practice is marked complete.
+
+The comparison shows raw before-and-after counts at comparable difficulty. It keeps those outcomes separate from placement and states the limits of the small sample. The original location-particle follow-up remains available for that specific diagnosis.

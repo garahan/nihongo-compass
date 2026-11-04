@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-errata','mahym-bank','transfer','engine','blueprint','session','report-analytics'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-errata','mahym-bank','transfer','engine','blueprint','session','report-analytics','mahym-topics','study-plan'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
   assert.equal(bank.length,273+mahymItems.length);
   assert.equal(mahymItems.length,2104);
@@ -100,6 +100,27 @@ vm.runInNewContext(source+`
   assert.equal(grammar.categories.find(row=>row.name==='Grammar').measured.length,1);
   assert.equal(grammar.levels.filter(row=>row.selected).length,1);
   assert.equal(grammar.levels.reduce((sum,row)=>sum+row.percent,0),100);
+  for (const skillId of [2,3]) {
+    const earlier = bank.filter(q=>q.level===4 && q.skill===skillId && availableForPlacement(q))
+      .slice(0,2).map(q=>attempt(q.id,1));
+    const seen = new Set(earlier.map(entry=>entry.id));
+    const plan = planCandidate({placement:earlier,reference:2},{id:skillId},null,seen);
+    assert(validStudyPlan(plan));
+    assert(plan.itemIds.every(id=>!seen.has(id)));
+    assert(!plan.itemIds.includes(chooseQuestion(earlier,()=>0,new Set(plan.itemIds)).id));
+    assert.equal(planStage(plan,0),'review');
+    const practicePlan = advancePlan(plan,1);
+    assert.equal(planStage(practicePlan,1),'practice');
+    let check = advancePlan(practicePlan,10);
+    assert.equal(planStage(check,check.readyAt-1),'waiting');
+    assert.equal(gradePlan(check,plan.itemIds[0],0,check.readyAt-1),check);
+    assert.equal(gradePlan(check,plan.itemIds[1],0,check.readyAt),check);
+    for (const id of plan.itemIds) check = gradePlan(check,id,0,check.readyAt);
+    assert(validStudyPlan(check));
+    assert.equal(planStage(check,check.readyAt),'complete');
+    assert.deepEqual(compareStudyPlan(check).before,{correct:0,total:2});
+    assert.deepEqual(compareStudyPlan(check).after,{correct:4,total:4});
+  }
   const wrong = assess([attempt(0,1)]);
   assert.deepEqual(skip.overall,assess([]).overall);
   assert(assess([attempt(0,null)],true).overall.weights[0]>skip.overall.weights[0]);

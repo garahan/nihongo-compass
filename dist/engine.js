@@ -138,7 +138,7 @@ function information(weights, probabilities) {
     mean(weights,probabilities.map(binaryEntropy)));
 }
 
-function chooseQuestion(attempts, random = Math.random) {
+function chooseQuestion(attempts, random = Math.random, reserved = new Set()) {
   const state = assess(attempts,true);
   const seen = new Set(attempts.map(entry=>entry.id));
   const last = attempts.at(-1);
@@ -167,7 +167,7 @@ function chooseQuestion(attempts, random = Math.random) {
   let best;
   let highest = -Infinity;
   for (const q of bank) {
-    if (seen.has(q.id) || !availableForPlacement(q)) continue;
+    if (seen.has(q.id) || reserved.has(q.id) || !availableForPlacement(q)) continue;
     const level = difficulty(q);
     const isPractice = state.taught.has(q.concept) ||
       (q.sourceId && state.taughtImported.has(q.family));

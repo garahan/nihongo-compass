@@ -19,6 +19,28 @@ const sessionStore = createSessionStore({
 let savedSession = sessionStore.load();
 let saveNotice = '';
 let followup;
+let studyPlan;
+const exposures = new Set(savedSession.attempts.map(entry=>entry.id));
+if (savedSession.active) exposures.add(savedSession.active.id);
+try {
+  const stored = JSON.parse(localStorage.getItem(studyPlanKey));
+  if (validStudyPlan(stored)) studyPlan = stored;
+  const history = JSON.parse(localStorage.getItem(exposureKey));
+  if (Array.isArray(history)) for (const id of history) {
+    if (Number.isInteger(id) && bank[id]) exposures.add(id);
+  }
+} catch {}
+
+function rememberExposure(id) {
+  if (exposures.has(id)) return;
+  exposures.add(id);
+  try { localStorage.setItem(exposureKey,JSON.stringify([...exposures])); } catch {}
+}
+
+function saveStudyPlan(plan) {
+  studyPlan = plan;
+  try { localStorage.setItem(studyPlanKey,JSON.stringify(plan)); } catch {}
+}
 try {
   const saved = JSON.parse(localStorage.getItem(transferKey));
   if (validTransfer(saved)) followup = saved;
@@ -26,7 +48,7 @@ try {
 
 function canContinue(list = attempts) {
   const seen = new Set(list.map(entry=>entry.id));
-  return bank.some(q=>availableForPlacement(q) && !seen.has(q.id));
+  return bank.some(q=>availableForPlacement(q) && !seen.has(q.id) && !studyPlan?.itemIds.includes(q.id));
 }
 
 function saveFollowup(record) {
@@ -80,13 +102,16 @@ function shuffle(values) {
 }
 
 function next() {
-  item = chooseQuestion(attempts);
+  item = chooseQuestion(attempts,Math.random,new Set(studyPlan?.itemIds));
   if (!item) return report();
   options = shuffle([0,1,2,3]);
   graded = false;
   shownAt = performance.now();
   timingInterrupted = document.hidden;
-  if (persist()) showQuestion();
+  if (persist()) {
+    rememberExposure(item.id);
+    showQuestion();
+  }
 }
 
 function focusHeading() {
@@ -102,6 +127,16 @@ function welcome() {
   if (latest?.length) app.querySelector('[data-progress]').textContent =
     `${latest.length} answers saved on this device`;
   app.querySelector('[data-action=transfer]').hidden = !followup;
+  const planButton = app.querySelector('[data-action=study-plan]');
+  const currentPlanStage = planStage(studyPlan,Date.now());
+  const prioritizePlan = ['review','practice','ready'].includes(currentPlanStage);
+  planButton.hidden = !studyPlan;
+  planButton.classList.toggle('secondary',!prioritizePlan);
+  app.querySelector('[data-action=start]').classList.toggle('secondary',prioritizePlan);
+  planButton.textContent = ({
+    review:'Continue review',practice:'Continue practice',waiting:'View study plan',
+    ready:'Check again',complete:'View study progress'
+  })[currentPlanStage]??'Open study plan';
   if (saveNotice) app.querySelector('[data-progress]').textContent = saveNotice;
   if ((savedSession.active && !savedSession.active.graded) || (latest.length && canContinue(latest))) {
     const start = app.querySelector('[data-action=start]');
@@ -181,6 +216,8 @@ function report() {
   const importedLesson = mahymRecommendation(focusedPlacement,reference);
   const diagnosis = locationDiagnosis(state);
   const eligibleForTransfer = !attempts.some(entry=>isTransferItem(entry.id));
+  const candidate = hasEstimate && !diagnosis.confirmed ?
+    planCandidate(state,focus,importedLesson,exposures,new Set(studyPlan?.itemIds)) : null;
   const plan = priority?.concept ? concepts[priority.concept] : priority ? {
     title:skills[priority.skill],lesson:tips[priority.skill][0],route:links[priority.skill]
   } : null;
@@ -236,6 +273,9 @@ function report() {
   ${hasEstimate && importedLesson?`<a href="study.html?lesson=${encodeURIComponent(importedLesson)}#lesson-exercises">Open lesson exercises →</a>`:`<a href="${hasEstimate?drill:'study.html'}">Open practice →</a>`}</li>
   <li><strong>3 · Check again</strong><p>${diagnosis.confirmed?'Use the delayed follow-up to check this distinction in new sentences.':'Answer fresh placement questions to refine the estimate.'}</p>
   ${diagnosis.confirmed && (followup || eligibleForTransfer)?'<button class="secondary" data-action="transfer">Open follow-up</button>':more?'<button class="secondary" data-action="continue">Continue test</button>':''}</li></ol>
+  ${studyPlan || candidate?`<div class="actions">${studyPlan?'<button class="secondary" data-action="study-plan">Open saved study plan</button>':''}
+  ${candidate && (!studyPlan || planStage(studyPlan,Date.now())==='complete')?'<button data-action="save-study-plan">Save this study path</button>':''}</div>`:''}
+  ${!studyPlan && !candidate && hasEstimate && focus && !diagnosis.confirmed?'<small>A saved check needs enough comparable placement answers and four fresh questions in this skill.</small>':''}
   <details class="extra-study"><summary>More study options</summary><a href="study.html">Browse the study library</a> · <a href="${drill}">${label(reference)} external drills</a></details></section>
   <div class="reportgrid"><section class="panel result-section" id="skills" tabindex="-1"><h2>Skill comparison</h2>${categoryBars}<small>Estimated performance on questions around ${label(reference)}. Grammar averages its measured subskills.</small>
   <details><summary>Detailed skill ranges</summary>${evidence}<small>The shaded bands show model uncertainty.</small></details>
@@ -285,6 +325,51 @@ function showFollowup() {
   focusHeading();
 }
 
+function showStudyPlan() {
+  if (!studyPlan) return welcome();
+  stage.textContent = 'Study plan';
+  const state = planStage(studyPlan,Date.now());
+  const skillName = skills[studyPlan.skill];
+  const level = label(studyPlan.band);
+  const lesson = studyPlan.lessonId ? 'study.html?lesson='+encodeURIComponent(studyPlan.lessonId) : null;
+  const practice = lesson ? lesson+'#lesson-exercises' : origin+'/challenge/'+level.toLowerCase();
+  const active = ({review:0,practice:1,waiting:2,ready:2,complete:2})[state];
+  let body;
+  if (state==='review') {
+    body = `<p>${lesson?mahymEscape(mahymTopics[studyPlan.lessonId]):tips[studyPlan.skill][0]}</p>
+      <div class="actions"><a class="button-link secondary" href="${lesson??origin+'/'+links[studyPlan.skill]}">Open review</a><button data-action="advance-study-plan">Mark review complete →</button></div>`;
+  } else if (state==='practice') {
+    body = `<p>Try new examples in practice. Mark this step complete when you’re ready to schedule your check.</p>
+      <div class="actions"><a class="button-link secondary" href="${practice}">Open practice</a><button data-action="advance-study-plan">Mark practice complete →</button></div>`;
+  } else if (state==='waiting') {
+    body = `<p>Four reserved questions unlock after <strong>${new Date(studyPlan.readyAt).toLocaleString()}</strong>.</p>
+      <p>The pause gives you a chance to see what you remember after practice.</p><button class="secondary" data-action="study-plan">Check availability</button>`;
+  } else if (state==='ready') {
+    const q = bank[studyPlan.itemIds[studyPlan.answers.length]];
+    rememberExposure(q.id);
+    body = `<p class="eyebrow">Fresh check · ${studyPlan.answers.length+1} of 4</p><h2>${q.prompt}</h2>
+      <div class="options">${shuffle([0,1,2,3]).map(choice=>
+        `<button class="option" data-plan-item="${q.id}" data-plan-choice="${choice}">${q.options[choice]}</button>`
+      ).join('')}</div><small>See all answers after question 4.</small>`;
+  } else {
+    const {before,after} = compareStudyPlan(studyPlan);
+    body = `<h2>Before and after</h2>${bar('Before practice',{n:before.total,right:before.correct})}
+      ${bar('Fresh check',{n:after.total,right:after.correct})}
+      <p>Both sets covered ${skillName.toLowerCase()} at ${level}. This small sample shows how you did on these questions. More checks are needed to establish improvement.</p>
+      <details><summary>Review check answers</summary>${studyPlan.answers.map(entry=>{
+        const q = bank[entry.id];
+        return `<details><summary>${q.prompt}</summary><p>Your answer: ${q.options[entry.choice]}<br>Correct answer: ${q.options[0]}<br>${q.why}</p></details>`;
+      }).join('')}</details>`;
+  }
+  app.innerHTML = `<section class="quiz panel"><p class="eyebrow">Saved study plan · ${level}</p><h1 tabindex="-1">${skillName}</h1>
+    <ol class="plan-progress" aria-label="Study plan stages">${['Review','Practice','Check again'].map((name,index)=>
+      `<li ${index===active?'aria-current="step"':''}>${index<active?'✓':index+1} · ${name}</li>`
+    ).join('')}</ol>${body}
+    <small>Study activity and check scores are separate from placement.</small>
+    <div class="actions"><button class="quiet" data-action="home">Back to start</button></div></section>`;
+  focusHeading();
+}
+
 app.addEventListener('click', event=>{
   const sectionLink = event.target.closest('.result-nav a');
   if (sectionLink && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
@@ -296,6 +381,14 @@ app.addEventListener('click', event=>{
   }
   const button = event.target.closest('button');
   if (!button || button.disabled) return;
+  if (button.dataset.planItem !== undefined) {
+    const nextPlan = gradePlan(studyPlan,Number(button.dataset.planItem),Number(button.dataset.planChoice),Date.now());
+    if (nextPlan!==studyPlan) {
+      saveStudyPlan(nextPlan);
+      showStudyPlan();
+    }
+    return;
+  }
   if (button.dataset.transferItem !== undefined) {
     const id = Number(button.dataset.transferItem);
     const choice = Number(button.dataset.transferChoice);
@@ -312,6 +405,25 @@ app.addEventListener('click', event=>{
     case 'resume': restoreQuestion(false); break;
     case 'continue': if(canContinue()) restoreQuestion(true); break;
     case 'transfer': showFollowup(); break;
+    case 'study-plan': showStudyPlan(); break;
+    case 'save-study-plan': {
+      if (studyPlan && planStage(studyPlan,Date.now())!=='complete') break;
+      const state = assess(attempts);
+      const focus = summarizeReport(state).focus;
+      const lesson = focus && mahymRecommendation(state.placement.filter(entry=>bank[entry.id].skill===focus.id),state.reference);
+      const candidate = planCandidate(state,focus,lesson,exposures,new Set(studyPlan?.itemIds));
+      if (candidate) {
+        saveStudyPlan(candidate);
+        showStudyPlan();
+      }
+      break;
+    }
+    case 'advance-study-plan':
+      if (studyPlan) {
+        saveStudyPlan(advancePlan(studyPlan,Date.now()));
+        showStudyPlan();
+      }
+      break;
     case 'arm-transfer':
       if (!followup && locationDiagnosis(assess(attempts)).confirmed &&
           !attempts.some(entry=>isTransferItem(entry.id))) {
