@@ -18,9 +18,10 @@ const skillPrior = bands.map(overall=>normalize(bands.map(skill=>
 const predictions = bands.map(level=>bands.map(ability=>chanceOfCorrect(ability,level)));
 const itemCurves = bank.map(question=>{
   const center = difficulty(question)+(question.offset??0);
+  const uncertainty = question.sourceId ? .65 : .45;
   // Average over plausible difficulties because these items have editorial
   // level tags and no empirical calibration yet.
-  return bands.map(ability=>mean([.25,.5,.25],[-.45,0,.45]
+  return bands.map(ability=>mean([.25,.5,.25],[-uncertainty,0,uncertainty]
     .map(delta=>chanceOfCorrect(ability,center+delta))));
 });
 
@@ -142,7 +143,7 @@ function chooseQuestion(attempts, random = Math.random) {
     const level = difficulty(q);
     const isPractice = state.taught.has(q.concept);
     const gap = state.skill[q.skill];
-    const curveKey = `${q.skill}:${level}:${q.offset??0}`;
+    const curveKey = `${q.skill}:${level}:${q.offset??0}:${Boolean(q.sourceId)}`;
     if (!gains.has(curveKey)) {
       const p = itemCurves[q.id];
       gains.set(curveKey,{
@@ -160,6 +161,7 @@ function chooseQuestion(attempts, random = Math.random) {
       (isPractice ? 0 : (stable?2:5)*gain.overall + (stable?3:1.5)*gain.skill) +
       .4/(1+gap.n) - .32*Math.abs(level-target) -
       (recentFamilies.has(q.family) ? .8 : 0) -
+      (q.sourceId ? .08 : 0) -
       (isPractice ? .7 : 0) + (probe ? 1.05 : 0) + (contrast ? 1.2 : 0) +
       (quick && level===previous+1 ? .15 : 0);
     const tieBroken = score+random()*.04;

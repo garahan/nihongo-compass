@@ -166,3 +166,8 @@ h1[tabindex="-1"]:focus { outline: none; }
 .skill-point { position: absolute; left: var(--at); top: 50%; width: 10px; height: 10px; border: 2px solid var(--paper); outline: 1px solid var(--accent); border-radius: 50%; background: var(--accent); transform: translate(-50%,-50%); }
 .extra-study { margin-top: 15px; }
 .reportgrid details { margin-top: 12px; }
+.library-link { margin-top: 16px; }
+.library-section { margin-bottom: 12px; }
+#library-content p { white-space: pre-line; }
+#library-content > .panel { margin-block: 12px; }
+#library-content details details { margin-left: 14px; }

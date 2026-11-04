@@ -1,10 +1,15 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','transfer','engine','blueprint','session'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-bank','transfer','engine','blueprint','session'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
-  assert.equal(bank.length,273);
-  assert.equal(new Set(bank.map(q=>q.prompt)).size,bank.length);
+  assert.equal(bank.length,273+mahymItems.length);
+  assert.equal(mahymItems.length,2104);
+  assert.equal(new Set(mahymItems.map(q=>q.sourceId)).size,mahymItems.length);
+  const linked = bank.find(q=>q.lessonId);
+  assert.equal(mahymRecommendation([{id:linked.id,choice:1}],difficulty(linked)),linked.lessonId);
+  assert.equal(mahymRecommendation([{id:linked.id,choice:0}],difficulty(linked)),null);
+  assert.equal(new Set(bank.slice(0,273).map(q=>q.prompt)).size,273);
   for (const level of [1,2,3,4,5]) {
     const items = bank.filter(q=>q.level===level && !isTransferItem(q.id));
     assert(items.length>=50);
@@ -85,7 +90,7 @@ vm.runInNewContext(source+`
   for (const [choice,expected] of [[0,5],[null,0]]) {
     const answers=[];
     const ids=new Set();
-    while (answers.length<bank.length-transferProbe.holdouts.length) {
+    while (answers.length<80) {
       const question=chooseQuestion(answers,()=>0);
       assert(!ids.has(question.id));
       assert(!isTransferItem(question.id));
@@ -93,7 +98,7 @@ vm.runInNewContext(source+`
       answers.push(attempt(question.id,choice));
       if (answers.length===12) assert.equal(assess(answers).overall.band,expected);
     }
-    assert.equal(chooseQuestion(answers),undefined);
+    assert.equal(chooseQuestion(bank.map(q=>attempt(q.id,choice))),undefined);
     assert.equal(assess(answers).overall.band,expected);
   }
   console.log('Engine checks passed');

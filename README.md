@@ -1,6 +1,6 @@
 # Nihongo Compass
 
-A static adaptive Japanese placement test. The current bank contains 273 original vocabulary and grammar questions. Results are provisional and progress is stored locally in the browser.
+A static adaptive Japanese placement test. The current bank contains 273 original and 2,104 imported vocabulary and grammar questions. Results are provisional and progress is stored locally in the browser.
 
 Open dist/index.html to run locally. Import this repository in Vercel and use the repository root. The checked-in Vercel configuration serves dist directly. The app has no build dependencies or environment variables.
 
@@ -8,7 +8,7 @@ Open dist/index.html to run locally. Import this repository in Vercel and use th
 
 The browser updates an overall estimate and a separate estimate for each skill. It selects unused questions for level information, skill coverage, or a targeted follow-up. Response time and streaks influence selection. A repeated tagged concept after feedback contributes to practice rather than placement. Reports show sparse skills as still checking.
 
-The bank includes 273 items. Six concepts have explicit follow-ups, including a prerequisite probe for permission forms. Untagged items still provide skill-level evidence. Item difficulty is editorial, so results remain provisional until calibrated against independent outcomes.
+The original bank includes 273 items. Six concepts have explicit follow-ups, including a prerequisite probe for permission forms. Untagged items still provide skill-level evidence. Item difficulty is editorial, so results remain provisional until calibrated against independent outcomes.
 
 Run the engine checks with `node test/engine.test.cjs`.
 
@@ -32,7 +32,7 @@ The current bank measures language knowledge. The [JLPT level descriptions](http
 
 The first flow distinguishes に for the location of existence from で for the location of an action. Only the distractor that swaps the two particles counts toward this diagnosis. A recommendation requires two matching errors, including at least one independent placement response. A matching mistake can prompt a question from the other side of the contrast.
 
-Two existing question IDs are reserved for a browser-local follow-up, leaving 271 items available to the adaptive test. The check unlocks 24 hours after the learner marks the review complete. It uses a different context for each side of the distinction and reveals the result after both answers. Placement and practice data remain separate from the follow-up. A legacy session that already used a reserved item does not qualify for a fresh check.
+Two existing question IDs are reserved for a browser-local follow-up, leaving 271 original items available to the adaptive test. The check unlocks 24 hours after the learner marks the review complete. It uses a different context for each side of the distinction and reveals the result after both answers. Placement and practice data remain separate from the follow-up. A legacy session that already used a reserved item does not qualify for a fresh check.
 
 The follow-up summary uses a Beta(1,1) update and reports only performance on the two items. Its small sample does not establish mastery or improvement. New concepts can reuse the pattern once they have tagged distractors, independent diagnostic items, and reserved transfer items.
 
@@ -55,3 +55,11 @@ The new level files contain original vocabulary, kanji-reading, particle, word-f
 The selector calculates information gain from each item's response curve for both the overall level and the skill being tested. It averages each curve over plausible difficulty values, favors skill coverage, and avoids clustering questions that share distractors. Related answers contribute progressively less independent placement evidence. The item IDs are append-only so saved answers and the reserved follow-up remain compatible.
 
 Difficulty and response curves are editorial defaults. Tests and model-generated simulations verify behavior under assumed response patterns. They do not establish accuracy against independent JLPT or learner outcomes.
+
+## Imported Mahym content and Codex handoff
+
+The [Japanese-Test-Mahym source](https://github.com/garahan/Japanese-Test-Mahym/tree/756bde7f6bc529d89eecc8fb5fdfae4bafed91a4) supplies 2,104 additional placement questions, 44 lessons, four graded stories, and 40 reading threads. Lesson exercises, passages, and listening scripts are available through the study library. Listening scripts are text practice. Imported questions linked to lessons can surface those lessons in the report.
+
+The importer quarantines duplicate prompts, invalid keys, and grammar blanks without an explicit meaning cue. Retained lesson exercises are still available for practice. Imported difficulty has a wider uncertainty allowance in the response model. Related prompts share a family where the source identifies a shared word or concept.
+
+Open a checkout of this repository as the project in Codex. The root `AGENTS.md` contains the handoff and verification rules. To regenerate the seed artifacts, run `node tools/import-mahym.cjs /path/to/Japanese-Test-Mahym` from the Compass root with the pinned source checkout. Preserve existing source ID order when updating. The source's dictionary notices are in `dist/licenses`.

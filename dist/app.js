@@ -171,6 +171,7 @@ function report() {
   const [lower,upper] = overall.range;
   const range = lower===upper ? '' : ` · Estimated range: ${label(lower)}–${label(upper)}`;
   const priority = studyPriority(state);
+  const importedLesson = mahymRecommendation(placement,reference);
   const diagnosis = locationDiagnosis(state);
   const eligibleForTransfer = !attempts.some(entry=>isTransferItem(entry.id));
   const plan = priority?.concept ? concepts[priority.concept] : priority ? {
@@ -202,10 +203,11 @@ function report() {
   <section class="panel result-section" id="study" tabindex="-1"><h2>Study next</h2>
   ${diagnosis.confirmed ? `<h3>${transferProbe.title}</h3><p>You chose the other location particle in ${diagnosis.placement+diagnosis.practice} sentences. ${transferProbe.explanation}</p>
   ${followup || eligibleForTransfer ? '<button data-action="transfer">Review and follow up</button>' : `<a class="button-link" href="${origin}/grammar">Open grammar library →</a>`}`
+  : importedLesson?`<p>Review a lesson linked to a question you missed near your working level.</p><a class="button-link" href="study.html?lesson=${encodeURIComponent(importedLesson)}">Open recommended lesson →</a>`
   : plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><a class="button-link" href="${origin}/${plan.route}">Open lesson library →</a>`
   : overall.band===0?`<p>Start with foundational Japanese.</p><a class="button-link" href="${origin}/materials">Open beginner lessons →</a>`
   : `<p>Practice at your estimated level.</p><a class="button-link" href="${drill}">Open ${label(reference)} drills →</a>`}
-  <details class="extra-study"><summary>More study options</summary><a href="${origin}/materials">Beginner lessons</a> · <a href="${drill}">${label(reference)} drills</a><small>External resources from Nihongo to Japan.</small></details></section>
+  <details class="extra-study"><summary>More study options</summary><a href="study.html">Browse the study library</a> · <a href="${drill}">${label(reference)} external drills</a></details></section>
   <div class="reportgrid"><section class="panel result-section" id="skills" tabindex="-1"><h2>Skill map</h2>${evidence}<small>Estimated readiness at ${label(reference)}. The shaded bands show model uncertainty.</small>
   <details><summary>Radar overview</summary>${radar(skill)}</details></section>
   <section class="panel"><h2>Evidence by level</h2>${bands.slice(1).map(band=>bar(label(band),tally(placement.filter(entry=>difficulty(bank[entry.id])===band)))).join('')}
