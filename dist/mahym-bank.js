@@ -4,6 +4,7 @@ const mahymEscape = text=>String(text??'').replace(/[&<>"']/g,char=>({
 for (const seed of mahymItems) {
   bank.push({
     ...seed,id:bank.length,
+    practiceOnly:Boolean(mahymErrata[seed.sourceId]),
     prompt:mahymEscape(seed.prompt),
     options:seed.options.map(mahymEscape),
     why:mahymEscape(seed.why)

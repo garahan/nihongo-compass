@@ -1,6 +1,6 @@
 # Nihongo Compass
 
-This repo is a static assessment and study library deployed from main to Vercel. Run `node test/engine.test.cjs` from the root after scoring or content changes.
+This repo is a static assessment and study library deployed from main to Vercel. Run `node test/engine.test.cjs` and `node test/import.test.cjs` from the root after scoring or content changes.
 
 - Keep the quiz one question at a time. Preserve saved sessions and the two reserved transfer items.
 - Append scored items only. Persisted numeric IDs are positional. Source IDs and lesson IDs are independent and stable.

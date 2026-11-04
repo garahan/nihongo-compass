@@ -1,14 +1,23 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-bank','transfer','engine','blueprint','session'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-errata','mahym-bank','transfer','engine','blueprint','session'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
   assert.equal(bank.length,273+mahymItems.length);
   assert.equal(mahymItems.length,2104);
   assert.equal(new Set(mahymItems.map(q=>q.sourceId)).size,mahymItems.length);
+  assert.equal(availableForPlacement(bank.find(q=>q.sourceId==='L33q7')),false);
+  assert.equal(assess([{id:bank.find(q=>q.sourceId==='L33q7').id,choice:1}]).placement.length,0);
   const linked = bank.find(q=>q.lessonId);
   assert.equal(mahymRecommendation([{id:linked.id,choice:1}],difficulty(linked)),linked.lessonId);
   assert.equal(mahymRecommendation([{id:linked.id,choice:0}],difficulty(linked)),null);
+  const first = bank.find(q=>q.sourceId && q.family && availableForPlacement(q) &&
+    bank.some(other=>other.id!==q.id && other.family===q.family && availableForPlacement(other)));
+  const related = bank.find(q=>q.id!==first.id && q.family===first.family && availableForPlacement(q));
+  const one = assess([{id:first.id,choice:0}]);
+  const two = assess([{id:first.id,choice:0},{id:related.id,choice:0}]);
+  assert.deepEqual(two.overall,one.overall);
+  assert.equal(two.practice.length,1);
   assert.equal(new Set(bank.slice(0,273).map(q=>q.prompt)).size,273);
   for (const level of [1,2,3,4,5]) {
     const items = bank.filter(q=>q.level===level && !isTransferItem(q.id));
@@ -93,7 +102,7 @@ vm.runInNewContext(source+`
     while (answers.length<80) {
       const question=chooseQuestion(answers,()=>0);
       assert(!ids.has(question.id));
-      assert(!isTransferItem(question.id));
+      assert(availableForPlacement(question));
       ids.add(question.id);
       answers.push(attempt(question.id,choice));
       if (answers.length===12) assert.equal(assess(answers).overall.band,expected);

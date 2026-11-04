@@ -1,6 +1,7 @@
 const bands = [0,1,2,3,4,5];
 const difficulty = question => 6-question.level;
 const label = band => band === 0 ? 'Below N5' : 'N' + (6-band);
+const availableForPlacement = question => !question.practiceOnly && !isTransferItem(question.id);
 
 function chanceOfCorrect(ability, level) {
   return .25 + .70 / (1 + Math.exp((level-ability)*1.8));
@@ -47,17 +48,20 @@ function credibleRange(weights, mass=.8) {
 
 function assess(attempts) {
   const taught = new Set();
+  const taughtImported = new Set();
   const practice = [];
   const placement = [];
   const evidenceBySkill = skills.map(()=>[]);
   for (const entry of attempts) {
     const q = bank[entry.id];
-    if (q.concept && taught.has(q.concept)) practice.push(entry);
+    if (q.practiceOnly || (q.concept && taught.has(q.concept)) ||
+        (q.sourceId && taughtImported.has(q.family))) practice.push(entry);
     else {
       placement.push(entry);
       evidenceBySkill[q.skill].push(entry);
     }
     if (q.concept) taught.add(q.concept);
+    if (q.sourceId && q.family) taughtImported.add(q.family);
   }
 
   // Skips are evidence of uncertainty, with less weight than a chosen error.
@@ -97,7 +101,7 @@ function assess(attempts) {
       conditional
     };
   });
-  return {overall,reference,placement,practice,taught,skill};
+  return {overall,reference,placement,practice,taught,taughtImported,skill};
 }
 
 function binaryEntropy(p) {
@@ -139,9 +143,10 @@ function chooseQuestion(attempts, random = Math.random) {
   let best;
   let highest = -Infinity;
   for (const q of bank) {
-    if (seen.has(q.id) || isTransferItem(q.id)) continue;
+    if (seen.has(q.id) || !availableForPlacement(q)) continue;
     const level = difficulty(q);
-    const isPractice = state.taught.has(q.concept);
+    const isPractice = state.taught.has(q.concept) ||
+      (q.sourceId && state.taughtImported.has(q.family));
     const gap = state.skill[q.skill];
     const curveKey = `${q.skill}:${level}:${q.offset??0}:${Boolean(q.sourceId)}`;
     if (!gains.has(curveKey)) {

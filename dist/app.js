@@ -26,7 +26,7 @@ try {
 
 function canContinue(list = attempts) {
   const seen = new Set(list.map(entry=>entry.id));
-  return bank.some(q=>!isTransferItem(q.id) && !seen.has(q.id));
+  return bank.some(q=>availableForPlacement(q) && !seen.has(q.id));
 }
 
 function saveFollowup(record) {
@@ -49,7 +49,8 @@ function persist() {
 function restoreQuestion(advance) {
   attempts = savedSession.attempts.slice();
   const active = savedSession.active;
-  if (!active || (advance && active.graded)) return next();
+  if (!active || (advance && active.graded) ||
+      (!active.graded && !availableForPlacement(bank[active.id]))) return next();
   item = bank[active.id];
   options = active.options.slice();
   graded = active.graded;
@@ -128,7 +129,7 @@ function showQuestion() {
   ${attempts.length<min ? `<progress aria-label="Progress toward first results" value="${attempts.length}" max="${min}"></progress>` : ''}</div>
   <h1 tabindex="-1" id="question" class="jp">${prompt}</h1>
   <div class="options">${options.map((choice,index)=>`<button class="option ${graded && choice===0?'right':graded && choice===entry.choice?'wrong':''}" data-choice="${choice}" ${graded?'disabled':'aria-keyshortcuts="Alt+'+(index+1)+'"'}><span class="option-key" aria-hidden="true">${index+1}</span><span class="option-text">${item.options[choice]}</span>${graded && choice===0?'<span class="option-mark">Correct</span>':graded && choice===entry.choice?'<span class="option-mark">Your answer</span>':''}</button>`).join('')}</div>
-  ${graded?`<p class="feedback" data-outcome="${answerText}" role="status" tabindex="-1"><strong>${answerText}.</strong> ${item.why}</p>`:''}
+  ${graded?`<p class="feedback" data-outcome="${answerText}" role="status" tabindex="-1">${item.practiceOnly?'This question was moved to practice after review. It does not count toward placement.':`<strong>${answerText}.</strong> ${item.why}`}</p>`:''}
   <div class="actions">${graded?(canContinue()?'<button data-action="next">Next question →</button>':''):'<button class="secondary" data-action="skip">Skip question</button>'}
   ${attempts.length>=min?`<button class="${canContinue()?'secondary':''}" data-action="finish">View results</button>`:''}</div>
   ${graded?'':'<small class="keyboard-hint">Keyboard shortcut: Alt / Option + 1–4</small>'}
@@ -196,14 +197,14 @@ function report() {
   }).join('');
   app.innerHTML = `<section class="panel result-head"><p class="eyebrow">Your placement · ${attempts.length} answers</p><h1 tabindex="-1">Likely ${label(overall.band)}</h1>
   <p>${total.right}/${total.n} placement answers correct${range}</p>
-  <p>Provisional estimate for language knowledge.${practice.length?` ${practice.length} follow-up answers tracked separately as practice.`:''}</p>
+  <p>Provisional estimate for language knowledge.${practice.length?` ${practice.length} answers tracked separately as practice.`:''}</p>
   <div class="actions">${more?'<button data-action="continue">Continue test →</button>':'<span>All available placement questions answered.</span>'}</div>
   ${more?`<small>${continuation}</small>`:''}</section>
   <nav class="result-nav" aria-label="Results sections"><a href="#study">Study next</a><a href="#skills">Skill map</a><a href="#review">Missed questions (${missed.length})</a></nav>
   <section class="panel result-section" id="study" tabindex="-1"><h2>Study next</h2>
   ${diagnosis.confirmed ? `<h3>${transferProbe.title}</h3><p>You chose the other location particle in ${diagnosis.placement+diagnosis.practice} sentences. ${transferProbe.explanation}</p>
   ${followup || eligibleForTransfer ? '<button data-action="transfer">Review and follow up</button>' : `<a class="button-link" href="${origin}/grammar">Open grammar library →</a>`}`
-  : importedLesson?`<p>Review a lesson linked to a question you missed near your working level.</p><a class="button-link" href="study.html?lesson=${encodeURIComponent(importedLesson)}">Open recommended lesson →</a>`
+  : importedLesson?`<p>Review a lesson linked to a question you missed.</p><a class="button-link" href="study.html?lesson=${encodeURIComponent(importedLesson)}">Open recommended lesson →</a>`
   : plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><a class="button-link" href="${origin}/${plan.route}">Open lesson library →</a>`
   : overall.band===0?`<p>Start with foundational Japanese.</p><a class="button-link" href="${origin}/materials">Open beginner lessons →</a>`
   : `<p>Practice at your estimated level.</p><a class="button-link" href="${drill}">Open ${label(reference)} drills →</a>`}
@@ -220,6 +221,7 @@ function report() {
   }).join('')}</ul></details></section></div>
   <section class="panel result-section" id="review" tabindex="-1"><h2>Review missed questions</h2>${missed.length?missed.map(entry=>{
     const q=bank[entry.id];
+    if (q.practiceOnly) return `<details><summary>Revised item · N${q.level} · ${q.prompt}</summary><p>This item was removed from placement after review.</p><a href="study.html?lesson=${encodeURIComponent(q.lessonId)}">Open corrected lesson exercise</a></details>`;
     return `<details><summary>${practice.includes(entry)?'Practice · ':''}N${q.level} · ${q.prompt}</summary><p>${entry.choice===null?'Skipped':'You chose: '+q.options[entry.choice]}<br><strong>Answer: ${q.options[0]}</strong><br>${q.why}</p></details>`;
   }).join(''):'<p>All attempted questions were correct.</p>'}</section>
   <div class="result-foot"><button data-action="home" class="quiet">Back to start</button><button data-action="restart" class="quiet">Start over</button></div>`;

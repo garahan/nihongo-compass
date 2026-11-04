@@ -16,14 +16,15 @@ function disclosure(title, parent) {
 }
 
 function exercise(parent,q) {
-  const prompt = q.s??q.q??q.a;
-  if (!prompt || !q.o?.length || q.o[q.c]==null ||
-      (q.s && q.a?.trim()!==q.o[q.c]?.trim())) return;
+  if (!q.o?.length || q.o[q.c]==null) return;
+  if (q.s && q.a?.trim()!==q.o[q.c]?.trim() && !mahymErrata[q.id]) return;
+  const {prompt,options,correctIndex} = correctMahym(q.id,q.s??q.q??q.a,q.o,q.c);
+  if (!prompt || new Set(options).size!==options.length) return;
   const box = disclosure(prompt,parent);
   box.append(node('ol'));
-  for (const option of q.o) box.lastChild.append(node('li',option));
+  for (const option of options) box.lastChild.append(node('li',option));
   const answer = disclosure('Reveal answer',box);
-  answer.append(node('p',q.o[q.c]),node('p',q.exp));
+  answer.append(node('p',options[correctIndex]),node('p',q.exp));
 }
 
 function showLesson(lesson) {

@@ -63,3 +63,9 @@ The [Japanese-Test-Mahym source](https://github.com/garahan/Japanese-Test-Mahym/
 The importer quarantines duplicate prompts, invalid keys, and grammar blanks without an explicit meaning cue. Retained lesson exercises are still available for practice. Imported difficulty has a wider uncertainty allowance in the response model. Related prompts share a family where the source identifies a shared word or concept.
 
 Open a checkout of this repository as the project in Codex. The root `AGENTS.md` contains the handoff and verification rules. To regenerate the seed artifacts, run `node tools/import-mahym.cjs /path/to/Japanese-Test-Mahym` from the Compass root with the pinned source checkout. Preserve existing source ID order when updating. The source's dictionary notices are in `dist/licenses`.
+
+### Import audit
+
+Run `node test/import.test.cjs` from the repository root to validate the imported lesson links, question keys and choices, reading and listening exercises, story panels, and thread content. The raw Mahym snapshot remains unchanged. The shared errata list corrects 29 exercises in the study library, including the seven original answer-key or choice failures. Twenty-two previously scored questions are now practice only, leaving 2,082 Mahym placement items. Their saved IDs remain valid. The model separates subsequent imported answers on the same taught word or linked concept as practice.
+
+These checks cover catalog integrity and the documented corrections. They are not a native-speaker review of every gloss or a calibration study.
