@@ -74,7 +74,7 @@ function assess(attempts) {
     const marginal = bands.map(ability=>mean(weights,conditional.map(row=>row[ability])));
     const evidence = evidenceBySkill[id];
     return {
-      n:evidence.length,
+      n:evidence.filter(entry=>entry.choice!==null).length,
       right:evidence.filter(entry=>entry.choice===0).length,
       readiness:mean(marginal,predictions[reference]),
       weights:marginal,

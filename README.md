@@ -35,3 +35,7 @@ The first flow distinguishes に for the location of existence from で for the 
 Two existing question IDs are reserved for a browser-local follow-up, leaving 71 items available to the adaptive test. The check unlocks 24 hours after the learner marks the review complete. It uses a different context for each side of the distinction and reveals the result after both answers. Placement and practice data remain separate from the follow-up. A legacy session that already used a reserved item does not qualify for a fresh check.
 
 The follow-up summary uses a Beta(1,1) update and reports only performance on the two items. Its small sample does not establish mastery or improvement. New concepts can reuse the pattern once they have tagged distractors, independent diagnostic items, and reserved transfer items.
+
+## Resuming a session
+
+The versioned browser session stores recorded answers, the active question, the option order, and whether feedback is showing. Older answer histories are read and migrated on the next write. Resumed question timing is excluded from the pace signal. Before writing, the store checks whether another tab has changed the saved session and reloads on a conflict. If storage is unavailable, progress stays in memory and the quiz shows a notice.

@@ -1,6 +1,5 @@
 const app = document.querySelector('#app');
 const stage = document.querySelector('#stage');
-const key = 'nihongo-compass-result-v1';
 const transferKey = 'nihongo-compass-transfer-v1';
 const min = 12;
 const max = bank.length;
@@ -13,7 +12,12 @@ let attempts = [];
 let item;
 let options;
 let graded = false;
-let latest;
+const sessionStore = createSessionStore({
+  getItem: key=>localStorage.getItem(key),
+  setItem: (key,value)=>localStorage.setItem(key,value)
+},bank);
+let savedSession = sessionStore.load();
+let saveNotice = '';
 let followup;
 try {
   const saved = JSON.parse(localStorage.getItem(transferKey));
@@ -29,16 +33,31 @@ function saveFollowup(record) {
   followup = record;
   try { localStorage.setItem(transferKey,JSON.stringify(record)); } catch {}
 }
-function save() {
-  latest = attempts.slice();
-  try { localStorage.setItem(key,JSON.stringify(latest)); } catch {}
+function persist() {
+  const active = item ? {id:item.id,options:options.slice(),graded} : null;
+  const {status,session} = sessionStore.save(attempts,active);
+  savedSession = session;
+  saveNotice = status==='temporary' ? 'Progress is available in this tab. Browser storage is unavailable.' : '';
+  if (status==='conflict') {
+    saveNotice = 'This test was updated in another tab. Continue from the latest saved question.';
+    welcome();
+    return false;
+  }
+  return true;
 }
-try {
-  const saved = JSON.parse(localStorage.getItem(key));
-  if (Array.isArray(saved) && saved.length > 0 && saved.length <= max &&
-      saved.every(entry => bank[entry.id] && [null,0,1,2,3].includes(entry.choice)) &&
-      new Set(saved.map(entry => entry.id)).size === saved.length) latest = saved;
-} catch {}
+
+function restoreQuestion(advance) {
+  attempts = savedSession.attempts.slice();
+  const active = savedSession.active;
+  if (!active || (advance && active.graded)) return next();
+  item = bank[active.id];
+  options = active.options.slice();
+  graded = active.graded;
+  shownAt = performance.now();
+  timingInterrupted = true;
+  showQuestion();
+}
+
 const tips = [
   ['Build a word deck from full sentences. Recall the meaning before revealing the gloss.','Study vocabulary'],
   ['Read each target word aloud in a sentence. Compare readings of the same kanji across different words.','Study kanji readings'],
@@ -66,7 +85,7 @@ function next() {
   graded = false;
   shownAt = performance.now();
   timingInterrupted = document.hidden;
-  showQuestion();
+  if (persist()) showQuestion();
 }
 
 function focusHeading() {
@@ -76,12 +95,14 @@ function focusHeading() {
 
 function welcome() {
   stage.textContent = 'Japanese placement';
+  const latest = savedSession.attempts;
   app.replaceChildren(document.querySelector('#welcome').content.cloneNode(true));
   app.querySelector('[data-action=latest]').hidden = !latest || latest.length < min;
   if (latest?.length) app.querySelector('[data-progress]').textContent =
     `${latest.length} answers saved on this device`;
   app.querySelector('[data-action=transfer]').hidden = !followup;
-  if (latest?.length && canContinue(latest)) {
+  if (saveNotice) app.querySelector('[data-progress]').textContent = saveNotice;
+  if ((savedSession.active && !savedSession.active.graded) || (latest.length && canContinue(latest))) {
     const start = app.querySelector('[data-action=start]');
     start.textContent = 'Continue test';
     start.dataset.action = 'resume';
@@ -110,7 +131,8 @@ function showQuestion() {
   ${graded?`<p class="feedback" data-outcome="${answerText}" role="status" tabindex="-1"><strong>${answerText}.</strong> ${item.why}</p>`:''}
   <div class="actions">${graded?(canContinue()?'<button data-action="next">Next question →</button>':''):'<button class="secondary" data-action="skip">Skip question</button>'}
   ${attempts.length>=min?`<button class="${canContinue()?'secondary':''}" data-action="finish">View results</button>`:''}</div>
-  ${graded?'':'<small class="keyboard-hint">Keyboard shortcut: Alt / Option + 1–4</small>'}</section>`;
+  ${graded?'':'<small class="keyboard-hint">Keyboard shortcut: Alt / Option + 1–4</small>'}
+  ${saveNotice?`<small role="status">${saveNotice}</small>`:''}</section>`;
   if (graded) app.querySelector('.feedback').focus();
   else focusHeading();
 }
@@ -119,9 +141,8 @@ function grade(choice) {
   if (graded || !item || attempts.length >= max) return;
   const seconds = (performance.now()-shownAt)/1000;
   attempts.push({id:item.id,choice,seconds:choice===null || timingInterrupted || seconds>90 ? null : seconds});
-  save();
   graded = true;
-  showQuestion();
+  if (persist()) showQuestion();
 }
 
 function radar(data) {
@@ -157,18 +178,36 @@ function report() {
   } : null;
   const drill = origin+'/challenge/'+label(reference).toLowerCase();
   const missed = attempts.filter(entry=>entry.choice!==0);
-  const evidence = skill.map(({n,readiness},id)=>`<div class="bar"><strong>${skills[id]}</strong><span>${n>=2?`${Math.round(readiness*100)}% · ${n} answers`:'Still checking'}</span>${n>=2?`<progress aria-label="${skills[id]} readiness" max="1" value="${readiness}"></progress>`:''}</div>`).join('');
+  const more = canContinue();
+  const sparse = skill.findIndex(row=>row.n<2);
+  const continuation = lower!==upper ? `More questions can narrow the ${label(lower)} to ${label(upper)} estimate.`
+    : sparse>=0 ? `More questions can help clarify skills with limited evidence, such as ${skills[sparse].toLowerCase()}.`
+    : 'More questions can help verify which skills need the most practice.';
+  const evidence = skill.map(({n,readiness,weights},id)=>{
+    if (n<2) return `<div class="bar"><strong>${skills[id]}</strong><span>Still checking</span></div>`;
+    const [low,high] = credibleRange(weights);
+    const percent = Math.round(readiness*100);
+    const from = Math.round(chanceOfCorrect(low,reference)*100);
+    const to = Math.round(chanceOfCorrect(high,reference)*100);
+    return `<div class="bar"><strong>${skills[id]}</strong><span>${percent}% · ${n} answers</span>
+      <div class="skill-track" role="img" aria-label="Model range ${from} to ${to} percent, estimate ${percent} percent">
+      <span class="skill-range" style="--from:${from}%;--width:${to-from}%"></span><span class="skill-point" style="--at:${percent}%"></span></div></div>`;
+  }).join('');
   app.innerHTML = `<section class="panel result-head"><p class="eyebrow">Your placement · ${attempts.length} answers</p><h1 tabindex="-1">Likely ${label(overall.band)}</h1>
   <p>${total.right}/${total.n} placement answers correct${range}</p>
   <p>Provisional estimate for language knowledge.${practice.length?` ${practice.length} follow-up answers tracked separately as practice.`:''}</p>
-  <div class="actions">${canContinue()?'<button data-action="continue">Continue test →</button>':'<span>All available placement questions answered.</span>'}</div></section>
+  <div class="actions">${more?'<button data-action="continue">Continue test →</button>':'<span>All available placement questions answered.</span>'}</div>
+  ${more?`<small>${continuation}</small>`:''}</section>
   <nav class="result-nav" aria-label="Results sections"><a href="#study">Study next</a><a href="#skills">Skill map</a><a href="#review">Missed questions (${missed.length})</a></nav>
   <section class="panel result-section" id="study" tabindex="-1"><h2>Study next</h2>
-  ${diagnosis.confirmed ? `<h3>${transferProbe.title}</h3><p>You chose the other location particle in ${diagnosis.placement+diagnosis.practice} sentences. ${transferProbe.explanation}</p><p><a href="${origin}/grammar">Open grammar library →</a></p>
-  ${followup || eligibleForTransfer ? '<button class="secondary" data-action="transfer">Review and follow up</button>' : '<small>Fresh follow-up items are unavailable for this saved session.</small>'}`
-  : plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><p><a href="${origin}/${plan.route}">Open lesson library →</a></p>`:'<p>Continue the test to identify a specific study priority.</p>'}
-  <div class="actions">${overall.band===0?`<a class="button-link secondary" href="${origin}/materials">Open beginner lessons</a>`:''}<a class="button-link secondary" href="${drill}">Open ${label(reference)} drills →</a></div><small>Resources from Nihongo to Japan.</small></section>
-  <div class="reportgrid"><section class="panel result-section" id="skills" tabindex="-1"><h2>Skill map</h2>${radar(skill)}${evidence}<small>Estimated readiness at ${label(reference)}, based on question difficulty and answers.</small></section>
+  ${diagnosis.confirmed ? `<h3>${transferProbe.title}</h3><p>You chose the other location particle in ${diagnosis.placement+diagnosis.practice} sentences. ${transferProbe.explanation}</p>
+  ${followup || eligibleForTransfer ? '<button data-action="transfer">Review and follow up</button>' : `<a class="button-link" href="${origin}/grammar">Open grammar library →</a>`}`
+  : plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><a class="button-link" href="${origin}/${plan.route}">Open lesson library →</a>`
+  : overall.band===0?`<p>Start with foundational Japanese.</p><a class="button-link" href="${origin}/materials">Open beginner lessons →</a>`
+  : `<p>Practice at your estimated level.</p><a class="button-link" href="${drill}">Open ${label(reference)} drills →</a>`}
+  <details class="extra-study"><summary>More study options</summary><a href="${origin}/materials">Beginner lessons</a> · <a href="${drill}">${label(reference)} drills</a><small>External resources from Nihongo to Japan.</small></details></section>
+  <div class="reportgrid"><section class="panel result-section" id="skills" tabindex="-1"><h2>Skill map</h2>${evidence}<small>Estimated readiness at ${label(reference)}. The shaded bands show model uncertainty.</small>
+  <details><summary>Radar overview</summary>${radar(skill)}</details></section>
   <section class="panel"><h2>Evidence by level</h2>${bands.slice(1).map(band=>bar(label(band),tally(placement.filter(entry=>difficulty(bank[entry.id])===band)))).join('')}
   <details><summary>What this test measures</summary>
   <p>Below N5 and N1 are the edges of the current estimate. The test cannot place you within foundations or beyond N1.</p>
@@ -236,9 +275,9 @@ app.addEventListener('click', event=>{
   }
   if (button.dataset.choice !== undefined) grade(Number(button.dataset.choice));
   switch(button.dataset.action){
-    case 'start': attempts=[]; next(); break;
-    case 'resume': attempts=latest.slice(); next(); break;
-    case 'continue': if(canContinue()) next(); break;
+    case 'start': attempts=[]; item=undefined; next(); break;
+    case 'resume': restoreQuestion(false); break;
+    case 'continue': if(canContinue()) restoreQuestion(true); break;
     case 'transfer': showFollowup(); break;
     case 'arm-transfer':
       if (!followup && locationDiagnosis(assess(attempts)).confirmed &&
@@ -250,11 +289,11 @@ app.addEventListener('click', event=>{
     case 'restart':
       if(confirm('Start a new test? This clears the current answers.')){
         attempts=[];
-        save();
+        item=undefined;
         next();
       }
       break;
-    case 'latest': if(latest){attempts=latest.slice(); report();} break;
+    case 'latest': if(savedSession.attempts.length>=min){attempts=savedSession.attempts.slice(); report();} break;
     case 'skip': grade(null); break;
     case 'next': if(graded && canContinue()) next(); break;
     case 'finish':

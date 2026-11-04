@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','transfer','engine','blueprint'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','transfer','engine','blueprint','session'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
   assert.equal(bank.length,73);
   for (const [id,q] of bank.entries()) {
@@ -12,6 +12,21 @@ vm.runInNewContext(source+`
   assert.equal(bank[4].concept,'action-place');
   assert.equal(chooseQuestion([],()=>0).level,3);
   const attempt = (id,choice)=>({id,choice,seconds:5});
+  const data = new Map([[legacySessionKey,JSON.stringify([attempt(4,0)])]]);
+  const storage = {getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value)};
+  const firstTab = createSessionStore(storage,bank);
+  const staleTab = createSessionStore(storage,bank);
+  assert.equal(firstTab.load().attempts[0].id,4);
+  staleTab.load();
+  const active = {id:5,options:[3,0,2,1],graded:false};
+  assert.equal(firstTab.save([attempt(4,0)],active).status,'saved');
+  assert.equal(staleTab.save([],null).status,'conflict');
+  assert.deepEqual(staleTab.load().active,active);
+  const graded = {...active,graded:true};
+  assert.equal(firstTab.save([attempt(4,0),attempt(5,2)],graded).status,'saved');
+  assert.deepEqual(createSessionStore(storage,bank).load().active,graded);
+  assert.equal(validSession({version:2,attempts:[attempt(5,2)],active},bank),false);
+  assert.equal(validSession({version:2,attempts:[],active:{...active,options:[0,0,1,2]}},bank),false);
   const misdiagnosed = assess([attempt(4,2),attempt(60,1)]);
   assert.equal(locationDiagnosis(misdiagnosed).confirmed,false);
   assert.equal(locationDiagnosis(assess([attempt(4,1),attempt(62,1)])).confirmed,true);
