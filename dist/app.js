@@ -264,7 +264,7 @@ function report() {
   ${diagnosis.confirmed ? `<h3>${transferProbe.title}</h3><p>You chose the other location particle in ${diagnosis.placement+diagnosis.practice} sentences. ${transferProbe.explanation}</p>
   ${followup || eligibleForTransfer ? '<button data-action="transfer">Review and follow up</button>' : `<a class="button-link" href="${origin}/grammar">Open grammar library →</a>`}`
   : !hasEstimate?`<p>Continue to build an estimate, or browse the study library.</p><a class="button-link" href="study.html">Browse study topics →</a>`
-  : importedLesson?`<p><b>${mahymEscape(mahymTopics[importedLesson]??'Recommended lesson')}</b><br>Linked to a question you missed.</p><a class="button-link" href="study.html?lesson=${encodeURIComponent(importedLesson)}">Open recommended lesson →</a>`
+  : importedLesson?`<p><b>${mahymEscape(studyTopics[importedLesson]??'Recommended lesson')}</b><br>Linked to a question you missed.</p><a class="button-link" href="study.html?lesson=${encodeURIComponent(importedLesson)}">Open recommended lesson →</a>`
   : focus && !priority?.concept?`<p>${tips[focus.id][0]}</p><a class="button-link" href="${origin}/${links[focus.id]}">Open ${skills[focus.id].toLowerCase()} resources →</a>`
   : plan?`<h3>${plan.title}</h3><p>${priority.repeated?'You missed this concept again in practice. ':''}${plan.lesson}</p><a class="button-link" href="${origin}/${plan.route}">Open lesson library →</a>`
   : overall.band===0?`<p>Start with foundational Japanese.</p><a class="button-link" href="${origin}/materials">Open beginner lessons →</a>`
@@ -336,7 +336,7 @@ function showStudyPlan() {
   const active = ({review:0,practice:1,waiting:2,ready:2,complete:2})[state];
   let body;
   if (state==='review') {
-    body = `<p>${lesson?mahymEscape(mahymTopics[studyPlan.lessonId]):tips[studyPlan.skill][0]}</p>
+    body = `<p>${lesson?mahymEscape(studyTopics[studyPlan.lessonId]):tips[studyPlan.skill][0]}</p>
       <div class="actions"><a class="button-link secondary" href="${lesson??origin+'/'+links[studyPlan.skill]}">Open review</a><button data-action="advance-study-plan">Mark review complete →</button></div>`;
   } else if (state==='practice') {
     body = `<p>Try new examples in practice. Mark this step complete when you’re ready to schedule your check.</p>

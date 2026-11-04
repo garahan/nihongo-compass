@@ -1,9 +1,9 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-errata','mahym-bank','transfer','engine','blueprint','session','report-analytics','mahym-topics','study-plan'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
+const source = ['bank','concepts','items-n5','items-n4','items-n3','items-n2','items-n1','mahym-items','mahym-errata','mahym-bank','compass-n3-bank','transfer','engine','blueprint','session','mahym-topics','report-analytics','study-plan'].map(file=>fs.readFileSync('dist/'+file+'.js','utf8')).join('\n');
 vm.runInNewContext(source+`
-  assert.equal(bank.length,273+mahymItems.length);
+  assert.equal(bank.length,273+mahymItems.length+compassN3Bank.length);
   assert.equal(mahymItems.length,2104);
   assert.equal(new Set(mahymItems.map(q=>q.sourceId)).size,mahymItems.length);
   assert.equal(availableForPlacement(bank.find(q=>q.sourceId==='L33q7')),false);

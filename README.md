@@ -87,3 +87,9 @@ The level chart shows relative model support across placement bands. Display rou
 When a study priority has at least two independent baseline answers in the same skill and level, Compass can save one review → practice → check plan. It reserves four fresh questions at that level, ranks them by closeness to the baseline response curves, and avoids already shown items, related item families, and items from the recommended lesson. A browser-local exposure record persists across test restarts. Checks unlock 24 hours after practice is marked complete.
 
 The comparison shows raw before-and-after counts at comparable difficulty. It keeps those outcomes separate from placement and states the limits of the small sample. The original location-particle follow-up remains available for that specific diagnosis.
+
+### N3 lesson expansion
+
+The study library has 26 N3 lessons, including 16 Compass-authored units alongside the ten Mahym units. Each new unit contains a grammar target, example sentences, four vocabulary entries, a short reading and dialogue script with comprehension checks, and two grammar exercises. The 32 linked items are appended after existing placement IDs. The selector treats the two items for a taught concept as related, and missed items can recommend their lesson. Passage and dialogue exercises remain outside placement.
+
+Regenerate the extension with `node tools/build-compass-n3.cjs` after editing `seeds/compass-n3.cjs`. Keep lesson order stable to preserve saved item IDs. Run both engine and import tests.

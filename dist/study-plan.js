@@ -52,7 +52,7 @@ function planCandidate(state,focus,lessonId,seen,excluded=new Set()) {
 function validStudyPlan(plan) {
   if (plan?.version!==1 || !Number.isInteger(plan.skill) || !skills[plan.skill] ||
       !bands.slice(1).includes(plan.band) || !['review','practice','check'].includes(plan.stage) ||
-      (plan.lessonId!==null && (typeof plan.lessonId!=='string' || !Object.hasOwn(mahymTopics,plan.lessonId))) ||
+      (plan.lessonId!==null && (typeof plan.lessonId!=='string' || !Object.hasOwn(studyTopics,plan.lessonId))) ||
       (plan.stage==='check' ? !Number.isFinite(plan.readyAt) : plan.readyAt!==null) ||
       !Array.isArray(plan.itemIds) || plan.itemIds.length!==4 ||
       !Array.isArray(plan.baseline) || plan.baseline.length<2 || plan.baseline.length>4 ||

@@ -1,3 +1,4 @@
+const studyTopics = {...mahymTopics,...compassN3Topics};
 const reportCategories = [
   {name:'Vocabulary',ids:[0]},
   {name:'Kanji readings',ids:[1]},

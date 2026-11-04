@@ -42,9 +42,11 @@ function showLesson(lesson) {
     for (const example of point.examples??[]) grammar.append(node('p',example));
     if (point.production) grammar.append(node('p',point.production));
   }
-  const kanji = disclosure('Kanji',panel);
-  for (const item of lesson.kanji??[]) {
-    kanji.append(node('p',[item.char,item.reading,item.meaning,item.exampleWord].filter(Boolean).join(' · ')));
+  if (lesson.kanji?.length) {
+    const kanji = disclosure('Kanji',panel);
+    for (const item of lesson.kanji) {
+      kanji.append(node('p',[item.char,item.reading,item.meaning,item.exampleWord].filter(Boolean).join(' · ')));
+    }
   }
   const reading = disclosure('Reading practice',panel);
   for (const text of Array.isArray(lesson.reading)?lesson.reading:lesson.reading?[lesson.reading]:[]) {
@@ -72,6 +74,7 @@ function showIndex({lessons,stories,threads}) {
     if (!rows.length) continue;
     const panel = node('section');
     panel.className = 'panel library-section';
+    panel.id = 'lessons-'+level.toLowerCase();
     panel.append(node('h2',level+' lessons'));
     const list = node('ul');
     for (const lesson of rows) {
@@ -103,18 +106,26 @@ function showIndex({lessons,stories,threads}) {
   }
 }
 
-fetch('mahym-study.json').then(response=>{
-  if (!response.ok) throw new Error('Study catalog unavailable');
-  return response.json();
-}).then(catalog=>{
-  libraryStatus.textContent = 'Practice material from Japanese Test Mahym. Study answers do not affect placement.';
+function loadCatalog(url) {
+  return fetch(url).then(response=>{
+    if (!response.ok) throw new Error('Study catalog unavailable');
+    return response.json();
+  });
+}
+
+Promise.all([loadCatalog('mahym-study.json'),loadCatalog('compass-n3-lessons.json')]).then(([base,n3])=>{
+  const catalog = {...base,lessons:[...base.lessons,...n3]};
+  libraryStatus.textContent = 'Practice material from Nihongo Compass and Japanese Test Mahym. Study answers do not affect placement.';
   const lesson = catalog.lessons.find(row=>row.lesson===query.get('lesson'));
   if (lesson) {
     const link = node('a','Browse all study topics');
     link.href = 'study.html';
     libraryContent.append(link);
     showLesson(lesson);
-  } else showIndex(catalog);
+  } else {
+    showIndex(catalog);
+    if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+  }
 }).catch(()=>{
   libraryStatus.textContent = 'Could not load the library. Refresh the page to try again.';
 });
